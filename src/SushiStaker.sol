@@ -3,8 +3,6 @@ pragma solidity ^0.8.22;
 
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -53,8 +51,6 @@ interface INonfungiblePositionManager {
  * @dev Uses EIP-7201 namespaced storage for transparent proxy compatibility
  */
 contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC721Receiver {
-    using SafeERC20 for IERC20;
-
     // =============================================================
     //                          ERRORS
     // =============================================================
@@ -265,23 +261,15 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         // Get token addresses from position
         (, , address token0, address token1, , , , , , , , ) = $.sushiNFT.positions(tokenId);
 
-        // Collect all available fees
+        // Collect all available fees directly to recipient
         (uint256 amount0, uint256 amount1) = $.sushiNFT.collect(
             INonfungiblePositionManager.CollectParams({
                 tokenId: tokenId,
-                recipient: address(this),
+                recipient: recipient,
                 amount0Max: type(uint128).max,
                 amount1Max: type(uint128).max
             })
         );
-
-        // Transfer collected fees to recipient
-        if (amount0 > 0) {
-            IERC20(token0).safeTransfer(recipient, amount0);
-        }
-        if (amount1 > 0) {
-            IERC20(token1).safeTransfer(recipient, amount1);
-        }
 
         // Emit event if any fees were collected
         if (amount0 > 0 || amount1 > 0) {
