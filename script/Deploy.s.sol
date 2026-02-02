@@ -38,20 +38,12 @@ contract DeploySushiStaker is Script {
         console.log("ProxyAdmin deployed at:", address(proxyAdmin));
 
         // Encode initialization data
-        bytes memory initData = abi.encodeWithSelector(
-            SushiStaker.initialize.selector,
-            sushiNFT,
-            factory,
-            feeCollector,
-            owner
-        );
+        bytes memory initData =
+            abi.encodeWithSelector(SushiStaker.initialize.selector, sushiNFT, factory, feeCollector, owner);
 
         // Deploy TransparentUpgradeableProxy
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(implementation),
-            address(proxyAdmin),
-            initData
-        );
+        TransparentUpgradeableProxy proxy =
+            new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
         console.log("Proxy deployed at:", address(proxy));
 
         vm.stopBroadcast();

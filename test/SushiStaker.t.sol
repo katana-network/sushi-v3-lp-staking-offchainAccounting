@@ -132,21 +132,12 @@ contract MockSushiNFT is ERC721 {
 contract MockFactory {
     mapping(address => mapping(address => mapping(uint24 => address))) public pools;
 
-    function setPool(
-        address token0,
-        address token1,
-        uint24 fee,
-        address pool
-    ) external {
+    function setPool(address token0, address token1, uint24 fee, address pool) external {
         pools[token0][token1][fee] = pool;
         pools[token1][token0][fee] = pool;
     }
 
-    function getPool(
-        address tokenA,
-        address tokenB,
-        uint24 fee
-    ) external view returns (address) {
+    function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address) {
         return pools[tokenA][tokenB][fee];
     }
 }
@@ -165,11 +156,7 @@ contract MockPool {
     function snapshotCumulativesInside(int24, int24)
         external
         view
-        returns (
-            int56 tickCumulativeInside,
-            uint160 secondsPerLiquidityInsideX128,
-            uint32 secondsInside
-        )
+        returns (int56 tickCumulativeInside, uint160 secondsPerLiquidityInsideX128, uint32 secondsInside)
     {
         return (0, mockSecondsPerLiquidity, 0);
     }
@@ -220,19 +207,11 @@ contract SushiStakerTest is Test {
 
         // Encode initialization data
         bytes memory initData = abi.encodeWithSelector(
-            SushiStaker.initialize.selector,
-            address(mockNFT),
-            address(mockFactory),
-            feeCollector,
-            owner
+            SushiStaker.initialize.selector, address(mockNFT), address(mockFactory), feeCollector, owner
         );
 
         // Deploy proxy
-        proxy = new TransparentUpgradeableProxy(
-            address(implementation),
-            address(proxyAdmin),
-            initData
-        );
+        proxy = new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
 
         // Get staker instance
         staker = SushiStaker(address(proxy));
@@ -245,14 +224,14 @@ contract SushiStakerTest is Test {
     function test_EIP7201StorageLocation() public pure {
         // Calculate expected storage location per EIP-7201
         // Formula: keccak256(abi.encode(uint256(keccak256("sushistaker.storage.main")) - 1)) & ~bytes32(uint256(0xff))
-        
+
         bytes32 namespaceHash = keccak256("sushistaker.storage.main");
         uint256 intermediate = uint256(namespaceHash) - 1;
         bytes32 encodedHash = keccak256(abi.encode(intermediate));
         bytes32 expected = encodedHash & ~bytes32(uint256(0xff));
-        
+
         bytes32 actual = bytes32(uint256(0xb440148b1c334507c0052c0f23ea4ea76d9ce3c5acb0c2d6dee0a0b55e066300));
-        
+
         assertEq(actual, expected, "Storage location does not match EIP-7201 calculation");
     }
 
@@ -272,19 +251,11 @@ contract SushiStakerTest is Test {
         ProxyAdmin newAdmin = new ProxyAdmin(owner);
 
         bytes memory initData = abi.encodeWithSelector(
-            SushiStaker.initialize.selector,
-            address(mockNFT),
-            address(mockFactory),
-            address(0),
-            owner
+            SushiStaker.initialize.selector, address(mockNFT), address(mockFactory), address(0), owner
         );
 
         vm.expectRevert(SushiStaker.ZeroAddress.selector);
-        new TransparentUpgradeableProxy(
-            address(newImpl),
-            address(newAdmin),
-            initData
-        );
+        new TransparentUpgradeableProxy(address(newImpl), address(newAdmin), initData);
     }
 
     // =============================================================
@@ -474,7 +445,9 @@ contract SushiStakerTest is Test {
         mockNFT.approve(address(staker), tokenId);
 
         vm.expectEmit(true, true, false, false);
-        emit SushiStaker.TokenStaked(alice, tokenId, address(mockPool), TICK_LOWER, TICK_UPPER, LIQUIDITY, 1000000, block.timestamp);
+        emit SushiStaker.TokenStaked(
+            alice, tokenId, address(mockPool), TICK_LOWER, TICK_UPPER, LIQUIDITY, 1000000, block.timestamp
+        );
 
         staker.stake(tokenId);
         vm.stopPrank();
@@ -495,7 +468,9 @@ contract SushiStakerTest is Test {
         mockPool.setMockSecondsPerLiquidity(2000000);
 
         vm.expectEmit(true, true, false, false);
-        emit SushiStaker.TokenUnstaked(alice, tokenId, address(mockPool), TICK_LOWER, TICK_UPPER, LIQUIDITY, 2000000, block.timestamp);
+        emit SushiStaker.TokenUnstaked(
+            alice, tokenId, address(mockPool), TICK_LOWER, TICK_UPPER, LIQUIDITY, 2000000, block.timestamp
+        );
 
         staker.unstake(tokenId);
         vm.stopPrank();
