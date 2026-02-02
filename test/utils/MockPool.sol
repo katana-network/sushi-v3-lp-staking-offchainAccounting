@@ -15,11 +15,7 @@ contract MockPool {
     function snapshotCumulativesInside(int24, int24)
         external
         view
-        returns (
-            int56 tickCumulativeInside,
-            uint160 secondsPerLiquidityInsideX128,
-            uint32 secondsInside
-        )
+        returns (int56 tickCumulativeInside, uint160 secondsPerLiquidityInsideX128, uint32 secondsInside)
     {
         return (0, mockSecondsPerLiquidity, 0);
     }

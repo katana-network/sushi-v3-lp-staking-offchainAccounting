@@ -55,19 +55,11 @@ abstract contract SushiStakerTestBase is Test {
 
         // Encode initialization data
         bytes memory initData = abi.encodeWithSelector(
-            SushiStaker.initialize.selector,
-            address(mockNFT),
-            address(mockFactory),
-            feeCollector,
-            owner
+            SushiStaker.initialize.selector, address(mockNFT), address(mockFactory), feeCollector, owner
         );
 
         // Deploy proxy
-        proxy = new TransparentUpgradeableProxy(
-            address(implementation),
-            address(proxyAdmin),
-            initData
-        );
+        proxy = new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
 
         // Get staker instance
         staker = SushiStaker(address(proxy));
