@@ -39,7 +39,10 @@ interface INonfungiblePositionManager {
             uint128 tokensOwed1
         );
 
-    function collect(CollectParams calldata params) external payable returns (uint256 amount0, uint256 amount1);
+    function collect(CollectParams calldata params)
+        external
+        payable
+        returns (uint256 amount0, uint256 amount1);
 }
 
 /**
@@ -144,10 +147,12 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
      * @param _feeCollector The fee collector address
      * @param _owner The owner of the contract
      */
-    function initialize(address _sushiNFT, address _factory, address _feeCollector, address _owner)
-        external
-        initializer
-    {
+    function initialize(
+        address _sushiNFT,
+        address _factory,
+        address _feeCollector,
+        address _owner
+    ) external initializer {
         if (_sushiNFT == address(0)) revert ZeroAddress();
         if (_factory == address(0)) revert ZeroAddress();
         if (_feeCollector == address(0)) revert ZeroAddress();
@@ -179,17 +184,12 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         if (IERC721(address($.sushiNFT)).ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
 
         // Transfer NFT to this contract
+        // Note: This triggers onERC721Received, which detects the locked
+        // reentrancy guard and returns early without double-staking
         IERC721(address($.sushiNFT)).safeTransferFrom(msg.sender, address(this), tokenId);
 
-        // Collect any existing fees and send to user (zero out fees before staking)
-        _collectAndTransferFees(tokenId, msg.sender, $);
-
-        // Record staking info
-        $.tokenStaker[tokenId] = msg.sender;
-        $.stakeTimestamp[tokenId] = block.timestamp;
-
-        // Emit event with position details
-        _emitStakeEvent(tokenId, msg.sender, $);
+        // Perform staking logic
+        _stakeInternal(tokenId, msg.sender, $);
     }
 
     /**
@@ -202,7 +202,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
 
         // Verify the token is staked
         if ($.tokenStaker[tokenId] == address(0)) revert TokenNotStaked();
-
+        
         // Verify the caller is the original staker
         if ($.tokenStaker[tokenId] != msg.sender) revert NotTokenStaker();
 
@@ -248,17 +248,23 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
      * @param recipient The address to receive the fees
      * @param $ Storage pointer
      */
-    function _collectAndTransferFees(uint256 tokenId, address recipient, SushiStakerStorage storage $) private {
+    function _collectAndTransferFees(
+        uint256 tokenId,
+        address recipient,
+        SushiStakerStorage storage $
+    ) private {
         // Get token addresses from position
-        (,, address token0, address token1,,,,,,,,) = $.sushiNFT.positions(tokenId);
+        (, , address token0, address token1, , , , , , , , ) = $.sushiNFT.positions(tokenId);
 
         // Collect all available fees directly to recipient
-        (uint256 amount0, uint256 amount1) = $.sushiNFT
-            .collect(
-                INonfungiblePositionManager.CollectParams({
-                    tokenId: tokenId, recipient: recipient, amount0Max: type(uint128).max, amount1Max: type(uint128).max
-                })
-            );
+        (uint256 amount0, uint256 amount1) = $.sushiNFT.collect(
+            INonfungiblePositionManager.CollectParams({
+                tokenId: tokenId,
+                recipient: recipient,
+                amount0Max: type(uint128).max,
+                amount1Max: type(uint128).max
+            })
+        );
 
         // Emit event if any fees were collected
         if (amount0 > 0 || amount1 > 0) {
@@ -267,11 +273,48 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
     }
 
     /**
+     * @dev Internal function to record staking state and emit event
+     * @param tokenId The token ID being staked
+     * @param staker The address to record as the staker
+     * @param $ Storage pointer
+     */
+    function _stakeInternal(
+        uint256 tokenId,
+        address staker,
+        SushiStakerStorage storage $
+    ) private {
+        // Collect any existing fees and send to staker
+        _collectAndTransferFees(tokenId, staker, $);
+
+        // Record staking info
+        $.tokenStaker[tokenId] = staker;
+        $.stakeTimestamp[tokenId] = block.timestamp;
+
+        // Emit event with position details
+        _emitStakeEvent(tokenId, staker, $);
+    }
+
+    /**
      * @dev Internal function to emit stake event with position details
      */
-    function _emitStakeEvent(uint256 tokenId, address user, SushiStakerStorage storage $) private {
-        (,, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity,,,,) =
-            $.sushiNFT.positions(tokenId);
+    function _emitStakeEvent(
+        uint256 tokenId,
+        address user,
+        SushiStakerStorage storage $
+    ) private {
+        (
+            ,
+            ,
+            address token0,
+            address token1,
+            uint24 fee,
+            int24 tickLower,
+            int24 tickUpper,
+            uint128 liquidity,
+            ,
+            ,
+            ,
+        ) = $.sushiNFT.positions(tokenId);
 
         // Verify position has liquidity
         if (liquidity == 0) revert ZeroLiquidity();
@@ -280,30 +323,59 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         address pool = $.factory.getPool(token0, token1, fee);
 
         // Get secondsPerLiquidityInsideX128
-        (, uint160 secondsPerLiquidityInsideInitialX128,) =
-            IUniswapV3Pool(pool).snapshotCumulativesInside(tickLower, tickUpper);
+        (, uint160 secondsPerLiquidityInsideInitialX128, ) = IUniswapV3Pool(pool)
+            .snapshotCumulativesInside(tickLower, tickUpper);
 
         emit TokenStaked(
-            user, tokenId, pool, tickLower, tickUpper, liquidity, secondsPerLiquidityInsideInitialX128, block.timestamp
+            user,
+            tokenId,
+            pool,
+            tickLower,
+            tickUpper,
+            liquidity,
+            secondsPerLiquidityInsideInitialX128,
+            block.timestamp
         );
     }
 
     /**
      * @dev Internal function to emit unstake event with position details
      */
-    function _emitUnstakeEvent(uint256 tokenId, address user, SushiStakerStorage storage $) private {
-        (,, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity,,,,) =
-            $.sushiNFT.positions(tokenId);
+    function _emitUnstakeEvent(
+        uint256 tokenId,
+        address user,
+        SushiStakerStorage storage $
+    ) private {
+        (
+            ,
+            ,
+            address token0,
+            address token1,
+            uint24 fee,
+            int24 tickLower,
+            int24 tickUpper,
+            uint128 liquidity,
+            ,
+            ,
+            ,
+        ) = $.sushiNFT.positions(tokenId);
 
         // Get pool address
         address pool = $.factory.getPool(token0, token1, fee);
 
         // Get current secondsPerLiquidityInsideX128
-        (, uint160 secondsPerLiquidityInsideX128,) =
-            IUniswapV3Pool(pool).snapshotCumulativesInside(tickLower, tickUpper);
+        (, uint160 secondsPerLiquidityInsideX128, ) = IUniswapV3Pool(pool)
+            .snapshotCumulativesInside(tickLower, tickUpper);
 
         emit TokenUnstaked(
-            user, tokenId, pool, tickLower, tickUpper, liquidity, secondsPerLiquidityInsideX128, block.timestamp
+            user,
+            tokenId,
+            pool,
+            tickLower,
+            tickUpper,
+            liquidity,
+            secondsPerLiquidityInsideX128,
+            block.timestamp
         );
     }
 
@@ -375,10 +447,17 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
     function getPositionInfo(uint256 tokenId)
         external
         view
-        returns (address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity)
+        returns (
+            address token0,
+            address token1,
+            uint24 fee,
+            int24 tickLower,
+            int24 tickUpper,
+            uint128 liquidity
+        )
     {
         SushiStakerStorage storage $ = _getSushiStakerStorage();
-        (,, token0, token1, fee, tickLower, tickUpper, liquidity,,,,) = $.sushiNFT.positions(tokenId);
+        (, , token0, token1, fee, tickLower, tickUpper, liquidity, , , , ) = $.sushiNFT.positions(tokenId);
     }
 
     // =============================================================
@@ -405,11 +484,33 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
 
     /**
      * @notice Handle the receipt of an NFT
-     * @dev Only accepts NFTs from the configured SushiSwap NFT contract
+     * @dev Automatically stakes NFTs sent directly from users.
+     *      When called from stake(), the reentrancy guard is locked,
+     *      so we detect that and return early (stake() handles staking).
      */
-    function onERC721Received(address, address, uint256, bytes calldata) external view override returns (bytes4) {
+    function onERC721Received(
+        address,
+        address from,
+        uint256 tokenId,
+        bytes calldata
+    ) external override returns (bytes4) {
         SushiStakerStorage storage $ = _getSushiStakerStorage();
+
+        // Only accept NFTs from the configured contract
         if (msg.sender != address($.sushiNFT)) revert InvalidNFTContract();
+
+        // If reentrancy guard is locked, we're being called from stake()
+        // Let stake() handle the staking logic
+        if (_reentrancyGuardEntered()) {
+            return IERC721Receiver.onERC721Received.selector;
+        }
+
+        // Direct transfer - validate sender is not zero (prevents minting to contract)
+        if (from == address(0)) revert ZeroAddress();
+
+        // Automatically stake for the sender
+        _stakeInternal(tokenId, from, $);
+
         return IERC721Receiver.onERC721Received.selector;
     }
 }
