@@ -398,7 +398,7 @@ contract SushiStakerTest is Test {
 
         // Expect FeesCollected event on stake
         vm.expectEmit(true, true, false, true);
-        emit SushiStaker.FeesCollected(tokenId, alice, token0, token1, 100 ether, 50 ether);
+        emit SushiStaker.FeesCollected(tokenId, alice, address(mockPool), token0, token1, 100 ether, 50 ether);
 
         staker.stake(tokenId);
         vm.stopPrank();
