@@ -9,6 +9,7 @@ import {MockSushiNFT} from "./MockSushiNFT.sol";
 import {MockFactory} from "./MockFactory.sol";
 import {MockPool} from "./MockPool.sol";
 import {MockERC20} from "./MockERC20.sol";
+import {MockGaugeVoter} from "./MockGaugeVoter.sol";
 
 /**
  * @title SushiStakerTestBase
@@ -22,6 +23,7 @@ abstract contract SushiStakerTestBase is Test {
     MockSushiNFT public mockNFT;
     MockFactory public mockFactory;
     MockPool public mockPool;
+    MockGaugeVoter public mockGaugeVoter;
 
     address public owner = makeAddr("owner");
     address public feeCollector = makeAddr("feeCollector");
@@ -40,6 +42,7 @@ abstract contract SushiStakerTestBase is Test {
         mockNFT = new MockSushiNFT();
         mockFactory = new MockFactory();
         mockPool = new MockPool();
+        mockGaugeVoter = new MockGaugeVoter();
 
         token0 = mockNFT.getToken0();
         token1 = mockNFT.getToken1();
@@ -55,7 +58,7 @@ abstract contract SushiStakerTestBase is Test {
 
         // Encode initialization data
         bytes memory initData = abi.encodeWithSelector(
-            SushiStaker.initialize.selector, address(mockNFT), address(mockFactory), feeCollector, owner
+            SushiStaker.initialize.selector, address(mockNFT), address(mockFactory), feeCollector, address(mockGaugeVoter), owner
         );
 
         // Deploy proxy
