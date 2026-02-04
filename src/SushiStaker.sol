@@ -190,17 +190,12 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         if (IERC721(address($.sushiNFT)).ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
 
         // Transfer NFT to this contract
+        // Note: This triggers onERC721Received, which detects the locked
+        // reentrancy guard and returns early without double-staking
         IERC721(address($.sushiNFT)).safeTransferFrom(msg.sender, address(this), tokenId);
 
-        // Collect any existing fees and send to user (zero out fees before staking)
-        _collectAndTransferFees(tokenId, msg.sender, $);
-
-        // Record staking info
-        $.tokenStaker[tokenId] = msg.sender;
-        $.stakeTimestamp[tokenId] = block.timestamp;
-
-        // Emit event with position details
-        _emitStakeEvent(tokenId, msg.sender, $);
+        // Perform staking logic
+        _stakeInternal(tokenId, msg.sender, $);
     }
 
     /**
@@ -277,6 +272,24 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
             address pool = $.factory.getPool(token0, token1, fee);
             emit FeesCollected(tokenId, recipient, epochId, pool, token0, token1, amount0, amount1);
         }
+    }
+
+    /**
+     * @dev Internal function to record staking state and emit event
+     * @param tokenId The token ID being staked
+     * @param staker The address to record as the staker
+     * @param $ Storage pointer
+     */
+    function _stakeInternal(uint256 tokenId, address staker, SushiStakerStorage storage $) private {
+        // Collect any existing fees and send to staker
+        _collectAndTransferFees(tokenId, staker, $);
+
+        // Record staking info
+        $.tokenStaker[tokenId] = staker;
+        $.stakeTimestamp[tokenId] = block.timestamp;
+
+        // Emit event with position details
+        _emitStakeEvent(tokenId, staker, $);
     }
 
     /**
@@ -438,11 +451,32 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
 
     /**
      * @notice Handle the receipt of an NFT
-     * @dev Only accepts NFTs from the configured SushiSwap NFT contract
+     * @dev Automatically stakes NFTs sent directly from users.
+     *      When called from stake(), the reentrancy guard is locked,
+     *      so we detect that and return early (stake() handles staking).
      */
-    function onERC721Received(address, address, uint256, bytes calldata) external view override returns (bytes4) {
+    function onERC721Received(address, address from, uint256 tokenId, bytes calldata)
+        external
+        override
+        returns (bytes4)
+    {
         SushiStakerStorage storage $ = _getSushiStakerStorage();
+
+        // Only accept NFTs from the configured contract
         if (msg.sender != address($.sushiNFT)) revert InvalidNFTContract();
+
+        // If reentrancy guard is locked, we're being called from stake()
+        // Let stake() handle the staking logic
+        if (_reentrancyGuardEntered()) {
+            return IERC721Receiver.onERC721Received.selector;
+        }
+
+        // Direct transfer - validate sender is not zero (prevents minting to contract)
+        if (from == address(0)) revert ZeroAddress();
+
+        // Automatically stake for the sender
+        _stakeInternal(tokenId, from, $);
+
         return IERC721Receiver.onERC721Received.selector;
     }
 }
