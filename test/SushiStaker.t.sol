@@ -434,7 +434,7 @@ contract SushiStakerTest is Test {
         mockNFT.approve(address(staker), tokenId);
 
         // Expect FeesCollected event on stake (epochId = 1 from mock)
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit();
         emit SushiStaker.FeesCollected(tokenId, alice, 1, address(mockPool), token0, token1, 100 ether, 50 ether);
 
         staker.stake(tokenId);
