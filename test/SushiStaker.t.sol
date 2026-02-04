@@ -449,7 +449,7 @@ contract SushiStakerTest is Test {
         address newFeeCollector = makeAddr("newFeeCollector");
 
         vm.prank(owner);
-        vm.expectEmit(true, true, false, false);
+        vm.expectEmit();
         emit SushiStaker.FeeCollectorUpdated(feeCollector, newFeeCollector);
 
         staker.setFeeCollector(newFeeCollector);
@@ -475,7 +475,7 @@ contract SushiStakerTest is Test {
         address newGaugeVoter = makeAddr("newGaugeVoter");
 
         vm.prank(owner);
-        vm.expectEmit(true, true, false, false);
+        vm.expectEmit();
         emit SushiStaker.GaugeVoterUpdated(address(mockGaugeVoter), newGaugeVoter);
 
         staker.setGaugeVoter(newGaugeVoter);
@@ -501,7 +501,7 @@ contract SushiStakerTest is Test {
         vm.startPrank(alice);
         mockNFT.approve(address(staker), tokenId);
 
-        vm.expectEmit(true, true, false, false);
+        vm.expectEmit();
         emit SushiStaker.TokenStaked(
             alice, tokenId, address(mockPool), TICK_LOWER, TICK_UPPER, LIQUIDITY, 1000000, block.timestamp
         );
@@ -524,7 +524,7 @@ contract SushiStakerTest is Test {
 
         mockPool.setMockSecondsPerLiquidity(2000000);
 
-        vm.expectEmit(true, true, false, false);
+        vm.expectEmit();
         emit SushiStaker.TokenUnstaked(
             alice, tokenId, address(mockPool), TICK_LOWER, TICK_UPPER, LIQUIDITY, 2000000, block.timestamp
         );
