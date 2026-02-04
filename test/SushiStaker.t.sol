@@ -163,6 +163,18 @@ contract MockPool {
 }
 
 /**
+ * @title MockGaugeVoter
+ * @notice Mock gauge voter for testing
+ */
+contract MockGaugeVoter {
+    uint256 public epochId = 1;
+
+    function setEpochId(uint256 _epochId) external {
+        epochId = _epochId;
+    }
+}
+
+/**
  * @title SushiStakerTest
  * @notice Test suite for SushiStaker contract
  */
@@ -174,6 +186,7 @@ contract SushiStakerTest is Test {
     MockSushiNFT public mockNFT;
     MockFactory public mockFactory;
     MockPool public mockPool;
+    MockGaugeVoter public mockGaugeVoter;
 
     address public owner = makeAddr("owner");
     address public feeCollector = makeAddr("feeCollector");
@@ -192,6 +205,7 @@ contract SushiStakerTest is Test {
         mockNFT = new MockSushiNFT();
         mockFactory = new MockFactory();
         mockPool = new MockPool();
+        mockGaugeVoter = new MockGaugeVoter();
 
         token0 = mockNFT.getToken0();
         token1 = mockNFT.getToken1();
@@ -207,7 +221,12 @@ contract SushiStakerTest is Test {
 
         // Encode initialization data
         bytes memory initData = abi.encodeWithSelector(
-            SushiStaker.initialize.selector, address(mockNFT), address(mockFactory), feeCollector, owner
+            SushiStaker.initialize.selector,
+            address(mockNFT),
+            address(mockFactory),
+            feeCollector,
+            address(mockGaugeVoter),
+            owner
         );
 
         // Deploy proxy
@@ -243,6 +262,7 @@ contract SushiStakerTest is Test {
         assertEq(staker.sushiNFT(), address(mockNFT));
         assertEq(staker.factory(), address(mockFactory));
         assertEq(staker.feeCollector(), feeCollector);
+        assertEq(staker.getGaugeVoter(), address(mockGaugeVoter));
         assertEq(staker.owner(), owner);
     }
 
@@ -251,7 +271,24 @@ contract SushiStakerTest is Test {
         ProxyAdmin newAdmin = new ProxyAdmin(owner);
 
         bytes memory initData = abi.encodeWithSelector(
-            SushiStaker.initialize.selector, address(mockNFT), address(mockFactory), address(0), owner
+            SushiStaker.initialize.selector,
+            address(mockNFT),
+            address(mockFactory),
+            address(0),
+            address(mockGaugeVoter),
+            owner
+        );
+
+        vm.expectRevert(SushiStaker.ZeroAddress.selector);
+        new TransparentUpgradeableProxy(address(newImpl), address(newAdmin), initData);
+    }
+
+    function test_RevertWhen_InitializeWithZeroGaugeVoter() public {
+        SushiStaker newImpl = new SushiStaker();
+        ProxyAdmin newAdmin = new ProxyAdmin(owner);
+
+        bytes memory initData = abi.encodeWithSelector(
+            SushiStaker.initialize.selector, address(mockNFT), address(mockFactory), feeCollector, address(0), owner
         );
 
         vm.expectRevert(SushiStaker.ZeroAddress.selector);
@@ -396,9 +433,9 @@ contract SushiStakerTest is Test {
         vm.startPrank(alice);
         mockNFT.approve(address(staker), tokenId);
 
-        // Expect FeesCollected event on stake
-        vm.expectEmit(true, true, false, true);
-        emit SushiStaker.FeesCollected(tokenId, alice, address(mockPool), token0, token1, 100 ether, 50 ether);
+        // Expect FeesCollected event on stake (epochId = 1 from mock)
+        vm.expectEmit(true, true, true, true);
+        emit SushiStaker.FeesCollected(tokenId, alice, 1, address(mockPool), token0, token1, 100 ether, 50 ether);
 
         staker.stake(tokenId);
         vm.stopPrank();
@@ -432,6 +469,26 @@ contract SushiStakerTest is Test {
         vm.prank(owner);
         vm.expectRevert(SushiStaker.ZeroAddress.selector);
         staker.setFeeCollector(address(0));
+    }
+
+    function test_SetGaugeVoter() public {
+        address newGaugeVoter = makeAddr("newGaugeVoter");
+
+        vm.prank(owner);
+        vm.expectEmit(true, true, false, false);
+        emit SushiStaker.GaugeVoterUpdated(address(mockGaugeVoter), newGaugeVoter);
+
+        staker.setGaugeVoter(newGaugeVoter);
+
+        assertEq(staker.getGaugeVoter(), newGaugeVoter);
+    }
+
+    function test_RevertWhen_SetGaugeVoterNotOwner() public {
+        address newGaugeVoter = makeAddr("newGaugeVoter");
+
+        vm.prank(alice);
+        vm.expectRevert();
+        staker.setGaugeVoter(newGaugeVoter);
     }
 
     // =============================================================
