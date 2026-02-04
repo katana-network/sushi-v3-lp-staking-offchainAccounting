@@ -15,3 +15,6 @@ docs/
 
 # Agents config
 .claude/
+
+# IDE
+.vscode/

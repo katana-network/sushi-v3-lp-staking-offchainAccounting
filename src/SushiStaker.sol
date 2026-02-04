@@ -88,6 +88,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
     event FeesCollected(
         uint256 indexed tokenId,
         address indexed recipient,
+        address indexed pool,
         address token0,
         address token1,
         uint256 amount0,
@@ -250,7 +251,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
      */
     function _collectAndTransferFees(uint256 tokenId, address recipient, SushiStakerStorage storage $) private {
         // Get token addresses from position
-        (,, address token0, address token1,,,,,,,,) = $.sushiNFT.positions(tokenId);
+        (,, address token0, address token1, uint24 fee,,,,,,,) = $.sushiNFT.positions(tokenId);
 
         // Collect all available fees directly to recipient
         (uint256 amount0, uint256 amount1) = $.sushiNFT
@@ -262,7 +263,9 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
 
         // Emit event if any fees were collected
         if (amount0 > 0 || amount1 > 0) {
-            emit FeesCollected(tokenId, recipient, token0, token1, amount0, amount1);
+            // Get pool address
+            address pool = $.factory.getPool(token0, token1, fee);
+            emit FeesCollected(tokenId, recipient, pool, token0, token1, amount0, amount1);
         }
     }
 
