@@ -8,6 +8,7 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {IAddressGaugeVoter} from "./interfaces/IAddressGaugeVoter.sol";
 
 /// @title Interface for the Nonfungible Position Manager
 /// @notice Minimal interface for interacting with Uniswap/SushiSwap V3 NFT positions
@@ -88,6 +89,8 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
     event FeesCollected(
         uint256 indexed tokenId,
         address indexed recipient,
+        uint256 indexed epochId,
+        address pool,
         address token0,
         address token1,
         uint256 amount0,
@@ -95,6 +98,8 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
     );
 
     event FeeCollectorUpdated(address indexed oldCollector, address indexed newCollector);
+
+    event GaugeVoterUpdated(address indexed oldGaugeVoter, address indexed newGaugeVoter);
 
     // =============================================================
     //                    EIP-7201 NAMESPACED STORAGE
@@ -112,6 +117,8 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         mapping(uint256 => address) tokenStaker;
         /// @notice Mapping from token ID to stake timestamp
         mapping(uint256 => uint256) stakeTimestamp;
+        /// @notice The gauge voter address
+        address gaugeVoter;
     }
 
     // keccak256(abi.encode(uint256(keccak256("sushistaker.storage.main")) - 1)) & ~bytes32(uint256(0xff))
@@ -142,15 +149,17 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
      * @param _sushiNFT The SushiSwap NFT contract address
      * @param _factory The Uniswap V3 Factory address
      * @param _feeCollector The fee collector address
+     * @param _gaugeVoter The gauge voter address
      * @param _owner The owner of the contract
      */
-    function initialize(address _sushiNFT, address _factory, address _feeCollector, address _owner)
+    function initialize(address _sushiNFT, address _factory, address _feeCollector, address _gaugeVoter, address _owner)
         external
         initializer
     {
         if (_sushiNFT == address(0)) revert ZeroAddress();
         if (_factory == address(0)) revert ZeroAddress();
         if (_feeCollector == address(0)) revert ZeroAddress();
+        if (_gaugeVoter == address(0)) revert ZeroAddress();
         if (_owner == address(0)) revert ZeroAddress();
 
         __Ownable_init(_owner);
@@ -159,8 +168,10 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         $.sushiNFT = INonfungiblePositionManager(_sushiNFT);
         $.factory = IUniswapV3Factory(_factory);
         $.feeCollector = _feeCollector;
+        $.gaugeVoter = _gaugeVoter;
 
         emit FeeCollectorUpdated(address(0), _feeCollector);
+        emit GaugeVoterUpdated(address(0), _gaugeVoter);
     }
 
     // =============================================================
@@ -245,7 +256,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
      */
     function _collectAndTransferFees(uint256 tokenId, address recipient, SushiStakerStorage storage $) private {
         // Get token addresses from position
-        (,, address token0, address token1,,,,,,,,) = $.sushiNFT.positions(tokenId);
+        (,, address token0, address token1, uint24 fee,,,,,,,) = $.sushiNFT.positions(tokenId);
 
         // Collect all available fees directly to recipient
         (uint256 amount0, uint256 amount1) = $.sushiNFT
@@ -257,7 +268,9 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
 
         // Emit event if any fees were collected
         if (amount0 > 0 || amount1 > 0) {
-            emit FeesCollected(tokenId, recipient, token0, token1, amount0, amount1);
+            uint256 epochId = IAddressGaugeVoter($.gaugeVoter).epochId();
+            address pool = $.factory.getPool(token0, token1, fee);
+            emit FeesCollected(tokenId, recipient, epochId, pool, token0, token1, amount0, amount1);
         }
     }
 
@@ -376,6 +389,14 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
     }
 
     /**
+     * @notice Get the gauge voter address
+     * @return The gauge voter address
+     */
+    function getGaugeVoter() external view returns (address) {
+        return _getSushiStakerStorage().gaugeVoter;
+    }
+
+    /**
      * @notice Get position information for a token
      * @param tokenId The token ID to query
      * @return token0 The first token of the pool
@@ -410,6 +431,18 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         $.feeCollector = _newFeeCollector;
 
         emit FeeCollectorUpdated(oldCollector, _newFeeCollector);
+    }
+
+    /**
+     * @notice Set the gauge voter address (only owner)
+     * @param _gaugeVoter The new gauge voter address
+     */
+    function setGaugeVoter(address _gaugeVoter) external onlyOwner {
+        SushiStakerStorage storage $ = _getSushiStakerStorage();
+        address oldGaugeVoter = $.gaugeVoter;
+        $.gaugeVoter = _gaugeVoter;
+
+        emit GaugeVoterUpdated(oldGaugeVoter, _gaugeVoter);
     }
 
     // =============================================================

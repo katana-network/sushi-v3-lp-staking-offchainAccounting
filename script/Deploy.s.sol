@@ -19,12 +19,14 @@ contract DeploySushiStaker is Script {
         address sushiNFT = vm.envAddress("SUSHI_NFT_CONTRACT");
         address factory = vm.envAddress("FACTORY_CONTRACT");
         address feeCollector = vm.envAddress("FEE_COLLECTOR");
+        address gaugeVoter = vm.envAddress("GAUGE_VOTER");
         address owner = vm.envAddress("OWNER_ADDRESS");
 
         console.log("Deploying SushiStaker...");
         console.log("SushiSwap NFT Contract:", sushiNFT);
         console.log("Factory Contract:", factory);
         console.log("Fee Collector:", feeCollector);
+        console.log("Gauge Voter:", gaugeVoter);
         console.log("Owner:", owner);
 
         vm.startBroadcast(deployerPrivateKey);
@@ -39,7 +41,7 @@ contract DeploySushiStaker is Script {
 
         // Encode initialization data
         bytes memory initData =
-            abi.encodeWithSelector(SushiStaker.initialize.selector, sushiNFT, factory, feeCollector, owner);
+            abi.encodeWithSelector(SushiStaker.initialize.selector, sushiNFT, factory, feeCollector, gaugeVoter, owner);
 
         // Deploy TransparentUpgradeableProxy
         TransparentUpgradeableProxy proxy =
