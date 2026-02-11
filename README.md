@@ -252,8 +252,11 @@ forge test -vvv
 # Test coverage
 forge coverage
 
-# Specific test
-forge test --match-test test_Stake
+# Run specific test file
+forge test --match-path "test/collectFeesMultipleStats.t.sol"
+
+# Run specific test
+forge test --match-test test_CollectFeesMultipleStats_MixedStakedAndUnstaked
 ```
 
 **Test Coverage:**
@@ -266,7 +269,18 @@ forge test --match-test test_Stake
 - Direct NFT transfers (auto-staking via `onERC721Received`)
 - EIP-7201 storage verification
 
-**Test Results:** 41 tests passing across 3 test suites
+**Test Structure:**
+Tests are organized in modular files by functionality:
+- `test/initialize.t.sol` - Initialization and storage tests (4 tests)
+- `test/stake.t.sol` - Staking functionality (7 tests)
+- `test/unstake.t.sol` - Unstaking functionality (4 tests)
+- `test/collectFeesMultiple.t.sol` - Batch fee collection (2 tests)
+- `test/collectFeesMultipleStats.t.sol` - Fee statistics preview (6 tests)
+- `test/onERC721Received.t.sol` - Direct NFT transfer handling (9 tests)
+- `test/setFeeCollector.t.sol` - Fee collector admin function (3 tests)
+- `test/setGaugeVoter.t.sol` - Gauge voter admin function (3 tests)
+
+**Test Results:** 38 tests passing across 8 test suites
 
 ## License
 
