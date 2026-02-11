@@ -23,3 +23,7 @@ docs/
 
 # Soldeer
 /dependencies
+
+# Foundry git submodules (not used - we use soldeer instead)
+/lib/
+foundry.lock
