@@ -85,7 +85,7 @@ contract StakeTest is SushiStakerTestBase {
 
         // Bob tries to stake Alice's token
         vm.prank(bob);
-        vm.expectRevert(SushiStaker.NotTokenOwner.selector);
+        vm.expectRevert(SushiStaker.SushiStakerNotTokenOwner.selector);
         staker.stake(tokenId);
     }
 
@@ -98,7 +98,7 @@ contract StakeTest is SushiStakerTestBase {
         vm.startPrank(alice);
         mockNft.approve(address(staker), tokenId);
 
-        vm.expectRevert(SushiStaker.ZeroLiquidity.selector);
+        vm.expectRevert(SushiStaker.SushiStakerZeroLiquidity.selector);
         staker.stake(tokenId);
         vm.stopPrank();
     }
