@@ -271,7 +271,7 @@ contract SushiStakerTest is SushiStakerTestBase {
 
     function test_RevertWhen_SetGaugeVoterZeroAddress() public {
         vm.prank(owner);
-        vm.expectRevert(SushiStaker.ZeroAddress.selector);
+        vm.expectRevert(SushiStaker.SushiStakerZeroAddress.selector);
         staker.setGaugeVoter(address(0));
     }
 

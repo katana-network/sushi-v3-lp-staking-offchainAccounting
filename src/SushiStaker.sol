@@ -506,7 +506,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
      * @param _gaugeVoter The new gauge voter address
      */
     function setGaugeVoter(address _gaugeVoter) external onlyOwner {
-        if (_gaugeVoter == address(0)) revert ZeroAddress();
+        if (_gaugeVoter == address(0)) revert SushiStakerZeroAddress();
 
         SushiStakerStorage storage $ = _getSushiStakerStorage();
         address oldGaugeVoter = $.gaugeVoter;
