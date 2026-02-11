@@ -13,7 +13,7 @@ contract StakeTest is SushiStakerTestBase {
     /**
      * @notice Test successful staking via stake()
      */
-    function test_StakeSuccess() public {
+    function test_stakeSuccess() public {
         uint256 tokenId = _mintNft(alice);
 
         vm.startPrank(alice);
@@ -31,7 +31,7 @@ contract StakeTest is SushiStakerTestBase {
     /**
      * @notice Test TokenStaked event is emitted with correct data
      */
-    function test_StakeEmitsEvent() public {
+    function test_stakeEmitsEvent() public {
         uint256 tokenId = _mintNft(alice);
 
         vm.startPrank(alice);
@@ -56,7 +56,7 @@ contract StakeTest is SushiStakerTestBase {
     /**
      * @notice Test pre-stake fees are collected and sent to staker
      */
-    function test_StakeCollectsPreStakeFees() public {
+    function test_stakeCollectsPreStakeFees() public {
         uint256 tokenId = _mintNft(alice);
 
         // Add pending fees before staking
@@ -80,7 +80,7 @@ contract StakeTest is SushiStakerTestBase {
     /**
      * @notice Test revert when caller doesn't own the NFT
      */
-    function test_StakeRevertsNotTokenOwner() public {
+    function test_revertWhen_stakeNotTokenOwner() public {
         uint256 tokenId = _mintNft(alice);
 
         // Bob tries to stake Alice's token
@@ -92,7 +92,7 @@ contract StakeTest is SushiStakerTestBase {
     /**
      * @notice Test revert when position has zero liquidity
      */
-    function test_StakeRevertsZeroLiquidity() public {
+    function test_revertWhen_stakeZeroLiquidity() public {
         uint256 tokenId = _mintNft(alice, 0);
 
         vm.startPrank(alice);
@@ -104,9 +104,28 @@ contract StakeTest is SushiStakerTestBase {
     }
 
     /**
+     * @notice Test FeesCollected event is emitted with correct data on stake
+     */
+    function test_stakeEmitsFeesCollectedEvent() public {
+        uint256 tokenId = _mintNft(alice);
+
+        mockNft.addPendingFees(tokenId, 100 ether, 50 ether);
+
+        vm.startPrank(alice);
+        mockNft.approve(address(staker), tokenId);
+
+        // Expect FeesCollected event on stake (epochId = 1 from mock)
+        vm.expectEmit();
+        emit SushiStaker.FeesCollected(tokenId, alice, 1, address(mockPool), token0, token1, 100 ether, 50 ether);
+
+        staker.stake(tokenId);
+        vm.stopPrank();
+    }
+
+    /**
      * @notice Test unstaking after staking via stake()
      */
-    function test_UnstakeAfterStake() public {
+    function test_unstakeAfterStake() public {
         uint256 tokenId = _mintNft(alice);
 
         // Stake
