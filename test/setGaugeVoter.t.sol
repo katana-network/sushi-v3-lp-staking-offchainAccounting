@@ -32,4 +32,13 @@ contract SetGaugeVoterTest is SushiStakerTestBase {
         vm.expectRevert();
         staker.setGaugeVoter(makeAddr("newGaugeVoter"));
     }
+
+    /**
+     * @notice Test revert when setting gauge voter to zero address
+     */
+    function test_revertWhen_setGaugeVoterZeroAddress() public {
+        vm.prank(owner);
+        vm.expectRevert(SushiStaker.SushiStakerZeroAddress.selector);
+        staker.setGaugeVoter(address(0));
+    }
 }
