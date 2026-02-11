@@ -96,7 +96,7 @@ contract OnERC721ReceivedTest is SushiStakerTestBase {
         uint256 tokenId = _mintNft(alice, 0);
 
         vm.prank(alice);
-        vm.expectRevert(SushiStaker.ZeroLiquidity.selector);
+        vm.expectRevert(SushiStaker.SushiStakerZeroLiquidity.selector);
         mockNft.safeTransferFrom(alice, address(staker), tokenId);
     }
 
@@ -108,7 +108,7 @@ contract OnERC721ReceivedTest is SushiStakerTestBase {
         uint256 tokenId = otherNft.mint(alice);
 
         vm.prank(alice);
-        vm.expectRevert(SushiStaker.InvalidNFTContract.selector);
+        vm.expectRevert(SushiStaker.SushiStakerInvalidNFTContract.selector);
         otherNft.safeTransferFrom(alice, address(staker), tokenId);
     }
 
@@ -126,7 +126,7 @@ contract OnERC721ReceivedTest is SushiStakerTestBase {
 
         // Simulate a call from the NFT contract with from=address(0)
         vm.prank(address(mockNft));
-        vm.expectRevert(SushiStaker.ZeroAddress.selector);
+        vm.expectRevert(SushiStaker.SushiStakerZeroAddress.selector);
         staker.onERC721Received(address(0), address(0), tokenId, "");
     }
 

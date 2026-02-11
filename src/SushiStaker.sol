@@ -21,17 +21,34 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
     //                          ERRORS
     // =============================================================
 
-    error InvalidNFTContract();
-    error NotTokenOwner();
-    error NotTokenStaker();
-    error TokenNotStaked();
-    error ZeroAddress();
-    error ZeroLiquidity();
+    /// @notice Thrown when an NFT is received from a contract other than the configured SushiSwap NFT.
+    error SushiStakerInvalidNFTContract();
+    /// @notice Thrown when the caller does not own the NFT they are trying to stake.
+    error SushiStakerNotTokenOwner();
+    /// @notice Thrown when the caller is not the original staker of the NFT they are trying to unstake.
+    error SushiStakerNotTokenStaker();
+    /// @notice Thrown when attempting to unstake a token that is not currently staked.
+    error SushiStakerTokenNotStaked();
+    /// @notice Thrown when a zero address is provided where a non-zero address is required.
+    error SushiStakerZeroAddress();
+    /// @notice Thrown when attempting to stake a position with zero liquidity.
+    error SushiStakerZeroLiquidity();
 
     // =============================================================
     //                          EVENTS
     // =============================================================
 
+    /**
+     * @notice Emitted when a SushiSwap V3 NFT position is staked.
+     * @param user The address of the user who staked the position.
+     * @param tokenId The NFT token ID of the staked position.
+     * @param pool The address of the SushiSwap V3 pool the position belongs to.
+     * @param tickLower The lower tick boundary of the position's price range.
+     * @param tickUpper The upper tick boundary of the position's price range.
+     * @param liquidity The amount of liquidity in the position at the time of staking.
+     * @param secondsPerLiquidityInsideInitialX128 Seconds per liquidity inside the tick range at stake time.
+     * @param timestamp The block timestamp when the position was staked.
+     */
     event TokenStaked(
         address indexed user,
         uint256 indexed tokenId,
@@ -43,6 +60,17 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         uint256 timestamp
     );
 
+    /**
+     * @notice Emitted when a staked SushiSwap V3 NFT position is unstaked and returned to the user.
+     * @param user The address of the user who unstaked the position.
+     * @param tokenId The NFT token ID of the unstaked position.
+     * @param pool The address of the SushiSwap V3 pool the position belongs to.
+     * @param tickLower The lower tick boundary of the position's price range.
+     * @param tickUpper The upper tick boundary of the position's price range.
+     * @param liquidity The amount of liquidity in the position at the time of unstaking.
+     * @param secondsPerLiquidityInsideX128 Cumulative seconds per liquidity inside the tick range at unstake time.
+     * @param timestamp The block timestamp when the position was unstaked.
+     */
     event TokenUnstaked(
         address indexed user,
         uint256 indexed tokenId,
@@ -54,6 +82,17 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         uint256 timestamp
     );
 
+    /**
+     * @notice Emitted when trading fees are collected from a staked position.
+     * @param tokenId The NFT token ID of the position fees were collected from.
+     * @param recipient The address that received the collected fees.
+     * @param epochId The gauge voter epoch ID at the time of fee collection, used for off-chain accounting.
+     * @param pool The address of the SushiSwap V3 pool the position belongs to.
+     * @param token0 The address of the pool's token0.
+     * @param token1 The address of the pool's token1.
+     * @param amount0 The amount of token0 fees collected.
+     * @param amount1 The amount of token1 fees collected.
+     */
     event FeesCollected(
         uint256 indexed tokenId,
         address indexed recipient,
@@ -65,8 +104,18 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         uint256 amount1
     );
 
+    /**
+     * @notice Emitted when the fee collector address is updated by the owner.
+     * @param oldCollector The previous fee collector address.
+     * @param newCollector The new fee collector address.
+     */
     event FeeCollectorUpdated(address indexed oldCollector, address indexed newCollector);
 
+    /**
+     * @notice Emitted when the gauge voter address is updated by the owner.
+     * @param oldGaugeVoter The previous gauge voter address.
+     * @param newGaugeVoter The new gauge voter address.
+     */
     event GaugeVoterUpdated(address indexed oldGaugeVoter, address indexed newGaugeVoter);
 
     // =============================================================
@@ -124,11 +173,11 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         external
         initializer
     {
-        if (_sushiNft == address(0)) revert ZeroAddress();
-        if (_factory == address(0)) revert ZeroAddress();
-        if (_feeCollector == address(0)) revert ZeroAddress();
-        if (_gaugeVoter == address(0)) revert ZeroAddress();
-        if (_owner == address(0)) revert ZeroAddress();
+        if (_sushiNft == address(0)) revert SushiStakerZeroAddress();
+        if (_factory == address(0)) revert SushiStakerZeroAddress();
+        if (_feeCollector == address(0)) revert SushiStakerZeroAddress();
+        if (_gaugeVoter == address(0)) revert SushiStakerZeroAddress();
+        if (_owner == address(0)) revert SushiStakerZeroAddress();
 
         __Ownable_init(_owner);
 
@@ -155,7 +204,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         SushiStakerStorage storage $ = _getSushiStakerStorage();
 
         // Verify the NFT is from the correct contract and user owns it
-        if (IERC721(address($.sushiNft)).ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
+        if (IERC721(address($.sushiNft)).ownerOf(tokenId) != msg.sender) revert SushiStakerNotTokenOwner();
 
         // Transfer NFT to this contract
         // Note: This triggers onERC721Received, which detects the locked
@@ -175,10 +224,10 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         SushiStakerStorage storage $ = _getSushiStakerStorage();
 
         // Verify the token is staked
-        if ($.tokenStaker[tokenId] == address(0)) revert TokenNotStaked();
+        if ($.tokenStaker[tokenId] == address(0)) revert SushiStakerTokenNotStaked();
 
         // Verify the caller is the original staker
-        if ($.tokenStaker[tokenId] != msg.sender) revert NotTokenStaker();
+        if ($.tokenStaker[tokenId] != msg.sender) revert SushiStakerNotTokenStaker();
 
         // Collect fees accumulated during staking and send to feeCollector
         _collectAndTransferFees(tokenId, $.feeCollector, $);
@@ -268,7 +317,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
             $.sushiNft.positions(tokenId);
 
         // Verify position has liquidity
-        if (liquidity == 0) revert ZeroLiquidity();
+        if (liquidity == 0) revert SushiStakerZeroLiquidity();
 
         // Get pool address
         address pool = $.factory.getPool(token0, token1, fee);
@@ -443,7 +492,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
      * @param _newFeeCollector The new fee collector address
      */
     function setFeeCollector(address _newFeeCollector) external onlyOwner {
-        if (_newFeeCollector == address(0)) revert ZeroAddress();
+        if (_newFeeCollector == address(0)) revert SushiStakerZeroAddress();
 
         SushiStakerStorage storage $ = _getSushiStakerStorage();
         address oldCollector = $.feeCollector;
@@ -484,7 +533,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         SushiStakerStorage storage $ = _getSushiStakerStorage();
 
         // Only accept NFTs from the configured contract
-        if (msg.sender != address($.sushiNft)) revert InvalidNFTContract();
+        if (msg.sender != address($.sushiNft)) revert SushiStakerInvalidNFTContract();
 
         // If reentrancy guard is locked, we're being called from stake()
         // Let stake() handle the staking logic
@@ -493,7 +542,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         }
 
         // Direct transfer - validate sender is not zero (prevents minting to contract)
-        if (from == address(0)) revert ZeroAddress();
+        if (from == address(0)) revert SushiStakerZeroAddress();
 
         // Automatically stake for the sender
         _stakeInternal(tokenId, from, $);

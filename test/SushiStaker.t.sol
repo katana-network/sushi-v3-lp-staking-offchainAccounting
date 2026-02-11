@@ -57,7 +57,7 @@ contract SushiStakerTest is SushiStakerTestBase {
             owner
         );
 
-        vm.expectRevert(SushiStaker.ZeroAddress.selector);
+        vm.expectRevert(SushiStaker.SushiStakerZeroAddress.selector);
         new TransparentUpgradeableProxy(address(newImpl), address(newAdmin), initData);
     }
 
@@ -69,7 +69,7 @@ contract SushiStakerTest is SushiStakerTestBase {
             SushiStaker.initialize.selector, address(mockNft), address(mockFactory), feeCollector, address(0), owner
         );
 
-        vm.expectRevert(SushiStaker.ZeroAddress.selector);
+        vm.expectRevert(SushiStaker.SushiStakerZeroAddress.selector);
         new TransparentUpgradeableProxy(address(newImpl), address(newAdmin), initData);
     }
 
@@ -245,7 +245,7 @@ contract SushiStakerTest is SushiStakerTestBase {
 
     function test_RevertWhen_SetFeeCollectorZeroAddress() public {
         vm.prank(owner);
-        vm.expectRevert(SushiStaker.ZeroAddress.selector);
+        vm.expectRevert(SushiStaker.SushiStakerZeroAddress.selector);
         staker.setFeeCollector(address(0));
     }
 
@@ -501,7 +501,7 @@ contract SushiStakerTest is SushiStakerTestBase {
         vm.startPrank(alice);
         mockNft.approve(address(staker), tokenId);
 
-        vm.expectRevert(SushiStaker.ZeroLiquidity.selector);
+        vm.expectRevert(SushiStaker.SushiStakerZeroLiquidity.selector);
         staker.stake(tokenId);
         vm.stopPrank();
     }
@@ -516,7 +516,7 @@ contract SushiStakerTest is SushiStakerTestBase {
 
         // Bob tries to unstake Alice's token
         vm.prank(bob);
-        vm.expectRevert(SushiStaker.NotTokenStaker.selector);
+        vm.expectRevert(SushiStaker.SushiStakerNotTokenStaker.selector);
         staker.unstake(tokenId);
     }
 
@@ -525,7 +525,7 @@ contract SushiStakerTest is SushiStakerTestBase {
 
         // Alice tries to unstake a token that was never staked
         vm.prank(alice);
-        vm.expectRevert(SushiStaker.TokenNotStaked.selector);
+        vm.expectRevert(SushiStaker.SushiStakerTokenNotStaked.selector);
         staker.unstake(tokenId);
     }
 }
