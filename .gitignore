@@ -20,9 +20,12 @@ docs/
 # IDE
 .vscode/
 
-
 # Soldeer
 /dependencies
+
+# Tests Coverage
+.coverage/
+lcov.info
 
 # Foundry git submodules (not used - we use soldeer instead)
 /lib/

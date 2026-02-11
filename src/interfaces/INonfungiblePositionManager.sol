@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.0;
 
 /// @title INonfungiblePositionManager
 /// @notice Minimal interface for SushiSwap V3 NonfungiblePositionManager
