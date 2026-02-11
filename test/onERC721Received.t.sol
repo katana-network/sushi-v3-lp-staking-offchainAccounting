@@ -30,7 +30,7 @@ contract OnERC721ReceivedTest is SushiStakerTestBase {
     /**
      * @notice Test NFT sent via safeTransferFrom is automatically staked
      */
-    function test_DirectTransferAutoStakes() public {
+    function test_directTransferAutoStakes() public {
         uint256 tokenId = _mintNft(alice);
 
         // Alice sends NFT directly to staker via safeTransferFrom
@@ -47,7 +47,7 @@ contract OnERC721ReceivedTest is SushiStakerTestBase {
     /**
      * @notice Test TokenStaked event is emitted on direct transfer
      */
-    function test_DirectTransferEmitsEvent() public {
+    function test_directTransferEmitsEvent() public {
         uint256 tokenId = _mintNft(alice);
 
         vm.expectEmit(true, true, false, true);
@@ -69,7 +69,7 @@ contract OnERC721ReceivedTest is SushiStakerTestBase {
     /**
      * @notice Test pre-stake fees are collected and sent to sender on direct transfer
      */
-    function test_DirectTransferCollectsFees() public {
+    function test_directTransferCollectsFees() public {
         uint256 tokenId = _mintNft(alice);
 
         // Add pending fees
@@ -92,7 +92,7 @@ contract OnERC721ReceivedTest is SushiStakerTestBase {
     /**
      * @notice Test revert when position has zero liquidity on direct transfer
      */
-    function test_DirectTransferRevertsZeroLiquidity() public {
+    function test_revertWhen_directTransferZeroLiquidity() public {
         uint256 tokenId = _mintNft(alice, 0);
 
         vm.prank(alice);
@@ -103,7 +103,7 @@ contract OnERC721ReceivedTest is SushiStakerTestBase {
     /**
      * @notice Test revert when NFT is from wrong contract
      */
-    function test_DirectTransferRevertsWrongNFT() public {
+    function test_revertWhen_directTransferWrongNFT() public {
         MockotherNft otherNft = new MockotherNft();
         uint256 tokenId = otherNft.mint(alice);
 
@@ -117,7 +117,7 @@ contract OnERC721ReceivedTest is SushiStakerTestBase {
      * @dev This is a hypothetical case since ERC721 doesn't normally allow minting
      *      with a transfer-like callback where from=0, but we test the guard anyway
      */
-    function test_DirectTransferRevertsFromZeroAddress() public {
+    function test_revertWhen_directTransferFromZeroAddress() public {
         // This test verifies the guard exists, though in practice this case
         // is hard to trigger since minting doesn't go through safeTransferFrom
         // We test by calling onERC721Received directly (simulating a malicious call)
@@ -133,7 +133,7 @@ contract OnERC721ReceivedTest is SushiStakerTestBase {
     /**
      * @notice Test unstaking after staking via direct transfer
      */
-    function test_UnstakeAfterDirectTransfer() public {
+    function test_unstakeAfterDirectTransfer() public {
         uint256 tokenId = _mintNft(alice);
 
         // Stake via direct transfer
@@ -157,7 +157,7 @@ contract OnERC721ReceivedTest is SushiStakerTestBase {
     /**
      * @notice Test that stake() and direct transfer produce equivalent results
      */
-    function test_StakeAndDirectTransferEquivalent() public {
+    function test_stakeAndDirectTransferEquivalent() public {
         uint256 tokenId1 = _mintNft(alice);
         uint256 tokenId2 = _mintNft(bob);
 
@@ -182,7 +182,7 @@ contract OnERC721ReceivedTest is SushiStakerTestBase {
     /**
      * @notice Test that fees go to the correct recipient in both staking methods
      */
-    function test_FeesGoToCorrectRecipient() public {
+    function test_feesGoToCorrectRecipient() public {
         uint256 tokenId1 = _mintNft(alice);
         uint256 tokenId2 = _mintNft(bob);
 
