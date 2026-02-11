@@ -14,7 +14,6 @@ import {
  * @notice Test suite for SushiStaker contract
  */
 contract SushiStakerTest is SushiStakerTestBase {
-
     // =============================================================
     //                     EIP-7201 STORAGE TESTS
     // =============================================================
@@ -388,7 +387,7 @@ contract SushiStakerTest is SushiStakerTestBase {
         assertEq(stats.stakedTokensCount, 2);
         assertEq(stats.unstakedTokensCount, 1);
         assertEq(stats.totalLiquidity, LIQUIDITY * 2);
-        
+
         // Verify unstaked token ID is correctly identified
         assertEq(stats.unstakedTokenIds.length, 1);
         assertEq(stats.unstakedTokenIds[0], tokenId2);
@@ -413,7 +412,7 @@ contract SushiStakerTest is SushiStakerTestBase {
         assertEq(stats.stakedTokensCount, 0);
         assertEq(stats.unstakedTokensCount, 2);
         assertEq(stats.totalLiquidity, 0);
-        
+
         // Verify all unstaked token IDs are returned
         assertEq(stats.unstakedTokenIds.length, 2);
         assertEq(stats.unstakedTokenIds[0], tokenId1);

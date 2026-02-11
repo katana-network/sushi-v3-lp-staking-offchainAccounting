@@ -416,8 +416,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
                 stats.stakedTokensCount++;
 
                 // Get position data including tokensOwed
-                (,,,,,,, uint128 liquidity,,, uint128 tokensOwed0, uint128 tokensOwed1) =
-                    $.sushiNft.positions(tokenId);
+                (,,,,,,, uint128 liquidity,,, uint128 tokensOwed0, uint128 tokensOwed1) = $.sushiNft.positions(tokenId);
 
                 // Accumulate fees and liquidity
                 stats.totalTokensOwed0 += tokensOwed0;

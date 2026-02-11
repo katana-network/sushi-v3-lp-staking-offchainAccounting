@@ -77,29 +77,29 @@ contract MockSushiNft is ERC721 {
     /// @dev In production, fees are calculated from pool state. This is a test helper.
     function addPendingFees(uint256 tokenId, uint256 amount0, uint256 amount1) external {
         Position storage position = positions[tokenId];
-        
+
         // Ensure values fit in uint128 before casting
         require(amount0 <= type(uint128).max, "Amount0 overflow");
         require(amount1 <= type(uint128).max, "Amount1 overflow");
-        
+
         // casting to 'uint128' is safe because we checked above
         // forge-lint: disable-next-line(unsafe-typecast)
         uint128 fee0 = uint128(amount0);
         // casting to 'uint128' is safe because we checked above
         // forge-lint: disable-next-line(unsafe-typecast)
         uint128 fee1 = uint128(amount1);
-        
+
         // Check for overflow on addition
         require(position.tokensOwed0 <= type(uint128).max - fee0, "TokensOwed0 overflow");
         require(position.tokensOwed1 <= type(uint128).max - fee1, "TokensOwed1 overflow");
-        
+
         position.tokensOwed0 += fee0;
         position.tokensOwed1 += fee1;
     }
 
     function collect(CollectParams calldata params) external returns (uint256 amount0, uint256 amount1) {
         Position storage position = positions[params.tokenId];
-        
+
         // Determine how much to collect (min of requested and available)
         amount0 = params.amount0Max > position.tokensOwed0 ? position.tokensOwed0 : params.amount0Max;
         amount1 = params.amount1Max > position.tokensOwed1 ? position.tokensOwed1 : params.amount1Max;
