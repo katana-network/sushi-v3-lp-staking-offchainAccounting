@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {Test} from "forge-std/Test.sol";
-import {SushiStaker} from "../../src/SushiStaker.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {MockSushiNFT} from "./MockSushiNFT.sol";
-import {MockFactory} from "./MockFactory.sol";
-import {MockPool} from "./MockPool.sol";
-import {MockERC20} from "./MockERC20.sol";
-import {MockGaugeVoter} from "./MockGaugeVoter.sol";
+import { SushiStaker } from "../../src/SushiStaker.sol";
+import { MockFactory } from "./MockFactory.sol";
+import { MockGaugeVoter } from "./MockGaugeVoter.sol";
+import { MockPool } from "./MockPool.sol";
+import { MockSushiNft } from "./MockSushiNft.sol";
+import { ProxyAdmin } from "@openzeppelin-contracts-5.5.0/proxy/transparent/ProxyAdmin.sol";
+import {
+    TransparentUpgradeableProxy
+} from "@openzeppelin-contracts-5.5.0/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { Test } from "forge-std/Test.sol";
 
 /**
  * @title SushiStakerTestBase
@@ -20,7 +21,7 @@ abstract contract SushiStakerTestBase is Test {
     SushiStaker public staker;
     ProxyAdmin public proxyAdmin;
     TransparentUpgradeableProxy public proxy;
-    MockSushiNFT public mockNFT;
+    MockSushiNft public mockNft;
     MockFactory public mockFactory;
     MockPool public mockPool;
     MockGaugeVoter public mockGaugeVoter;
@@ -35,17 +36,17 @@ abstract contract SushiStakerTestBase is Test {
     uint24 public constant FEE = 3000;
     int24 public constant TICK_LOWER = -100;
     int24 public constant TICK_UPPER = 100;
-    uint128 public constant LIQUIDITY = 1000000;
+    uint128 public constant LIQUIDITY = 1_000_000;
 
     function setUp() public virtual {
         // Deploy mocks
-        mockNFT = new MockSushiNFT();
+        mockNft = new MockSushiNft();
         mockFactory = new MockFactory();
         mockPool = new MockPool();
         mockGaugeVoter = new MockGaugeVoter();
 
-        token0 = mockNFT.getToken0();
-        token1 = mockNFT.getToken1();
+        token0 = mockNft.getToken0();
+        token1 = mockNft.getToken1();
 
         // Setup factory to return pool
         mockFactory.setPool(token0, token1, FEE, address(mockPool));
@@ -59,7 +60,7 @@ abstract contract SushiStakerTestBase is Test {
         // Encode initialization data
         bytes memory initData = abi.encodeWithSelector(
             SushiStaker.initialize.selector,
-            address(mockNFT),
+            address(mockNft),
             address(mockFactory),
             feeCollector,
             address(mockGaugeVoter),
@@ -76,14 +77,14 @@ abstract contract SushiStakerTestBase is Test {
     /**
      * @dev Helper function to mint an NFT position
      */
-    function _mintNFT(address to, uint128 liquidity) internal returns (uint256) {
-        return mockNFT.mint(to, token0, token1, FEE, TICK_LOWER, TICK_UPPER, liquidity);
+    function _mintNft(address to, uint128 liquidity) internal returns (uint256) {
+        return mockNft.mint(to, token0, token1, FEE, TICK_LOWER, TICK_UPPER, liquidity);
     }
 
     /**
      * @dev Helper function to mint an NFT position with default liquidity
      */
-    function _mintNFT(address to) internal returns (uint256) {
-        return _mintNFT(to, LIQUIDITY);
+    function _mintNft(address to) internal returns (uint256) {
+        return _mintNft(to, LIQUIDITY);
     }
 }

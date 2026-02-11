@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {Test} from "forge-std/Test.sol";
-import {SushiStaker} from "../src/SushiStaker.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { SushiStaker } from "../src/SushiStaker.sol";
+import { ProxyAdmin } from "@openzeppelin-contracts-5.5.0/proxy/transparent/ProxyAdmin.sol";
+import {
+    TransparentUpgradeableProxy
+} from "@openzeppelin-contracts-5.5.0/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { ERC20 } from "@openzeppelin-contracts-5.5.0/token/ERC20/ERC20.sol";
+import { ERC721 } from "@openzeppelin-contracts-5.5.0/token/ERC721/ERC721.sol";
+import { Test } from "forge-std/Test.sol";
 
 /**
  * @title MockERC20
  * @notice Mock ERC20 for testing
  */
 contract MockERC20 is ERC20 {
-    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) { }
 
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
@@ -21,10 +23,10 @@ contract MockERC20 is ERC20 {
 }
 
 /**
- * @title MockSushiNFT
+ * @title MockSushiNft
  * @notice Mock ERC721 with positions() and collect() for testing
  */
-contract MockSushiNFT is ERC721 {
+contract MockSushiNft is ERC721 {
     uint256 private _tokenIdCounter;
 
     struct Position {
@@ -53,12 +55,12 @@ contract MockSushiNFT is ERC721 {
     mapping(uint256 => uint256) public pendingFees0;
     mapping(uint256 => uint256) public pendingFees1;
 
-    MockERC20 public immutable mockToken0;
-    MockERC20 public immutable mockToken1;
+    MockERC20 public immutable MOCK_TOKEN_0;
+    MockERC20 public immutable MOCK_TOKEN_1;
 
     constructor() ERC721("SushiSwap V3 Positions", "SUSHI-V3-POS") {
-        mockToken0 = new MockERC20("Token0", "TK0");
-        mockToken1 = new MockERC20("Token1", "TK1");
+        MOCK_TOKEN_0 = new MockERC20("Token0", "TK0");
+        MOCK_TOKEN_1 = new MockERC20("Token1", "TK1");
     }
 
     function mint(
@@ -107,21 +109,21 @@ contract MockSushiNFT is ERC721 {
         pendingFees1[params.tokenId] -= amount1;
 
         if (amount0 > 0) {
-            mockToken0.mint(params.recipient, amount0);
+            MOCK_TOKEN_0.mint(params.recipient, amount0);
         }
         if (amount1 > 0) {
-            mockToken1.mint(params.recipient, amount1);
+            MOCK_TOKEN_1.mint(params.recipient, amount1);
         }
 
         return (amount0, amount1);
     }
 
     function getToken0() external view returns (address) {
-        return address(mockToken0);
+        return address(MOCK_TOKEN_0);
     }
 
     function getToken1() external view returns (address) {
-        return address(mockToken1);
+        return address(MOCK_TOKEN_1);
     }
 }
 
@@ -147,7 +149,7 @@ contract MockFactory {
  * @notice Mock pool for testing
  */
 contract MockPool {
-    uint160 public mockSecondsPerLiquidity = 1000000;
+    uint160 public mockSecondsPerLiquidity = 1_000_000;
 
     function setMockSecondsPerLiquidity(uint160 value) external {
         mockSecondsPerLiquidity = value;
@@ -183,7 +185,7 @@ contract SushiStakerTest is Test {
     SushiStaker public staker;
     ProxyAdmin public proxyAdmin;
     TransparentUpgradeableProxy public proxy;
-    MockSushiNFT public mockNFT;
+    MockSushiNft public mockNft;
     MockFactory public mockFactory;
     MockPool public mockPool;
     MockGaugeVoter public mockGaugeVoter;
@@ -198,17 +200,17 @@ contract SushiStakerTest is Test {
     uint24 public constant FEE = 3000;
     int24 public constant TICK_LOWER = -100;
     int24 public constant TICK_UPPER = 100;
-    uint128 public constant LIQUIDITY = 1000000;
+    uint128 public constant LIQUIDITY = 1_000_000;
 
     function setUp() public {
         // Deploy mocks
-        mockNFT = new MockSushiNFT();
+        mockNft = new MockSushiNft();
         mockFactory = new MockFactory();
         mockPool = new MockPool();
         mockGaugeVoter = new MockGaugeVoter();
 
-        token0 = mockNFT.getToken0();
-        token1 = mockNFT.getToken1();
+        token0 = mockNft.getToken0();
+        token1 = mockNft.getToken1();
 
         // Setup factory to return pool
         mockFactory.setPool(token0, token1, FEE, address(mockPool));
@@ -222,7 +224,7 @@ contract SushiStakerTest is Test {
         // Encode initialization data
         bytes memory initData = abi.encodeWithSelector(
             SushiStaker.initialize.selector,
-            address(mockNFT),
+            address(mockNft),
             address(mockFactory),
             feeCollector,
             address(mockGaugeVoter),
@@ -259,7 +261,7 @@ contract SushiStakerTest is Test {
     // =============================================================
 
     function test_Initialize() public view {
-        assertEq(staker.sushiNFT(), address(mockNFT));
+        assertEq(staker.sushiNft(), address(mockNft));
         assertEq(staker.factory(), address(mockFactory));
         assertEq(staker.feeCollector(), feeCollector);
         assertEq(staker.getGaugeVoter(), address(mockGaugeVoter));
@@ -272,7 +274,7 @@ contract SushiStakerTest is Test {
 
         bytes memory initData = abi.encodeWithSelector(
             SushiStaker.initialize.selector,
-            address(mockNFT),
+            address(mockNft),
             address(mockFactory),
             address(0),
             address(mockGaugeVoter),
@@ -288,7 +290,7 @@ contract SushiStakerTest is Test {
         ProxyAdmin newAdmin = new ProxyAdmin(owner);
 
         bytes memory initData = abi.encodeWithSelector(
-            SushiStaker.initialize.selector, address(mockNFT), address(mockFactory), feeCollector, address(0), owner
+            SushiStaker.initialize.selector, address(mockNft), address(mockFactory), feeCollector, address(0), owner
         );
 
         vm.expectRevert(SushiStaker.ZeroAddress.selector);
@@ -301,19 +303,19 @@ contract SushiStakerTest is Test {
 
     function test_StakeWithExistingFees() public {
         // Mint NFT to alice
-        uint256 tokenId = mockNFT.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
 
         // Add pending fees before staking
         uint256 preFee0 = 100 ether;
         uint256 preFee1 = 50 ether;
-        mockNFT.addPendingFees(tokenId, preFee0, preFee1);
+        mockNft.addPendingFees(tokenId, preFee0, preFee1);
 
         uint256 aliceBalance0Before = MockERC20(token0).balanceOf(alice);
         uint256 aliceBalance1Before = MockERC20(token1).balanceOf(alice);
 
         // Alice stakes (fees should be collected and sent to her)
         vm.startPrank(alice);
-        mockNFT.approve(address(staker), tokenId);
+        mockNft.approve(address(staker), tokenId);
         staker.stake(tokenId);
         vm.stopPrank();
 
@@ -328,17 +330,17 @@ contract SushiStakerTest is Test {
 
     function test_UnstakeWithAccumulatedFees() public {
         // Mint and stake NFT
-        uint256 tokenId = mockNFT.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
 
         vm.startPrank(alice);
-        mockNFT.approve(address(staker), tokenId);
+        mockNft.approve(address(staker), tokenId);
         staker.stake(tokenId);
         vm.stopPrank();
 
         // Simulate fee accumulation while staked
         uint256 stakedFee0 = 200 ether;
         uint256 stakedFee1 = 100 ether;
-        mockNFT.addPendingFees(tokenId, stakedFee0, stakedFee1);
+        mockNft.addPendingFees(tokenId, stakedFee0, stakedFee1);
 
         uint256 feeCollectorBalance0Before = MockERC20(token0).balanceOf(feeCollector);
         uint256 feeCollectorBalance1Before = MockERC20(token1).balanceOf(feeCollector);
@@ -352,31 +354,31 @@ contract SushiStakerTest is Test {
         assertEq(MockERC20(token1).balanceOf(feeCollector), feeCollectorBalance1Before + stakedFee1);
 
         // Verify alice got her NFT back
-        assertEq(mockNFT.ownerOf(tokenId), alice);
+        assertEq(mockNft.ownerOf(tokenId), alice);
     }
 
     function test_CollectFeesMultiple() public {
         // Stake multiple positions
-        uint256 tokenId1 = mockNFT.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
-        uint256 tokenId2 = mockNFT.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
-        uint256 tokenId3 = mockNFT.mint(bob, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId1 = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId2 = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId3 = mockNft.mint(bob, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
 
         vm.startPrank(alice);
-        mockNFT.approve(address(staker), tokenId1);
-        mockNFT.approve(address(staker), tokenId2);
+        mockNft.approve(address(staker), tokenId1);
+        mockNft.approve(address(staker), tokenId2);
         staker.stake(tokenId1);
         staker.stake(tokenId2);
         vm.stopPrank();
 
         vm.startPrank(bob);
-        mockNFT.approve(address(staker), tokenId3);
+        mockNft.approve(address(staker), tokenId3);
         staker.stake(tokenId3);
         vm.stopPrank();
 
         // Add fees to all positions
-        mockNFT.addPendingFees(tokenId1, 100 ether, 50 ether);
-        mockNFT.addPendingFees(tokenId2, 150 ether, 75 ether);
-        mockNFT.addPendingFees(tokenId3, 200 ether, 100 ether);
+        mockNft.addPendingFees(tokenId1, 100 ether, 50 ether);
+        mockNft.addPendingFees(tokenId2, 150 ether, 75 ether);
+        mockNft.addPendingFees(tokenId3, 200 ether, 100 ether);
 
         uint256 feeCollectorBalance0Before = MockERC20(token0).balanceOf(feeCollector);
         uint256 feeCollectorBalance1Before = MockERC20(token1).balanceOf(feeCollector);
@@ -400,17 +402,17 @@ contract SushiStakerTest is Test {
 
     function test_CollectFeesMultipleSkipsUnstakedTokens() public {
         // Stake one position
-        uint256 tokenId1 = mockNFT.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
-        uint256 tokenId2 = mockNFT.mint(bob, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY); // Not staked
+        uint256 tokenId1 = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId2 = mockNft.mint(bob, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY); // Not staked
 
         vm.startPrank(alice);
-        mockNFT.approve(address(staker), tokenId1);
+        mockNft.approve(address(staker), tokenId1);
         staker.stake(tokenId1);
         vm.stopPrank();
 
         // Add fees to both
-        mockNFT.addPendingFees(tokenId1, 100 ether, 50 ether);
-        mockNFT.addPendingFees(tokenId2, 200 ether, 100 ether);
+        mockNft.addPendingFees(tokenId1, 100 ether, 50 ether);
+        mockNft.addPendingFees(tokenId2, 200 ether, 100 ether);
 
         uint256 feeCollectorBalance0Before = MockERC20(token0).balanceOf(feeCollector);
 
@@ -426,12 +428,12 @@ contract SushiStakerTest is Test {
     }
 
     function test_FeesCollectedEvent() public {
-        uint256 tokenId = mockNFT.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
 
-        mockNFT.addPendingFees(tokenId, 100 ether, 50 ether);
+        mockNft.addPendingFees(tokenId, 100 ether, 50 ether);
 
         vm.startPrank(alice);
-        mockNFT.approve(address(staker), tokenId);
+        mockNft.approve(address(staker), tokenId);
 
         // Expect FeesCollected event on stake (epochId = 1 from mock)
         vm.expectEmit();
@@ -496,14 +498,14 @@ contract SushiStakerTest is Test {
     // =============================================================
 
     function test_Stake() public {
-        uint256 tokenId = mockNFT.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
 
         vm.startPrank(alice);
-        mockNFT.approve(address(staker), tokenId);
+        mockNft.approve(address(staker), tokenId);
 
         vm.expectEmit();
         emit SushiStaker.TokenStaked(
-            alice, tokenId, address(mockPool), TICK_LOWER, TICK_UPPER, LIQUIDITY, 1000000, block.timestamp
+            alice, tokenId, address(mockPool), TICK_LOWER, TICK_UPPER, LIQUIDITY, 1_000_000, block.timestamp
         );
 
         staker.stake(tokenId);
@@ -512,21 +514,21 @@ contract SushiStakerTest is Test {
         assertEq(staker.getStaker(tokenId), alice);
         assertEq(staker.getStakeTimestamp(tokenId), block.timestamp);
         assertEq(staker.isStaked(tokenId), true);
-        assertEq(mockNFT.ownerOf(tokenId), address(staker));
+        assertEq(mockNft.ownerOf(tokenId), address(staker));
     }
 
     function test_Unstake() public {
-        uint256 tokenId = mockNFT.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
 
         vm.startPrank(alice);
-        mockNFT.approve(address(staker), tokenId);
+        mockNft.approve(address(staker), tokenId);
         staker.stake(tokenId);
 
-        mockPool.setMockSecondsPerLiquidity(2000000);
+        mockPool.setMockSecondsPerLiquidity(2_000_000);
 
         vm.expectEmit();
         emit SushiStaker.TokenUnstaked(
-            alice, tokenId, address(mockPool), TICK_LOWER, TICK_UPPER, LIQUIDITY, 2000000, block.timestamp
+            alice, tokenId, address(mockPool), TICK_LOWER, TICK_UPPER, LIQUIDITY, 2_000_000, block.timestamp
         );
 
         staker.unstake(tokenId);
@@ -534,14 +536,14 @@ contract SushiStakerTest is Test {
 
         assertEq(staker.getStaker(tokenId), address(0));
         assertEq(staker.isStaked(tokenId), false);
-        assertEq(mockNFT.ownerOf(tokenId), alice);
+        assertEq(mockNft.ownerOf(tokenId), alice);
     }
 
     function test_RevertWhen_StakeZeroLiquidity() public {
-        uint256 tokenId = mockNFT.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, 0);
+        uint256 tokenId = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, 0);
 
         vm.startPrank(alice);
-        mockNFT.approve(address(staker), tokenId);
+        mockNft.approve(address(staker), tokenId);
 
         vm.expectRevert(SushiStaker.ZeroLiquidity.selector);
         staker.stake(tokenId);
@@ -549,10 +551,10 @@ contract SushiStakerTest is Test {
     }
 
     function test_RevertWhen_UnstakeNotStaker() public {
-        uint256 tokenId = mockNFT.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
 
         vm.startPrank(alice);
-        mockNFT.approve(address(staker), tokenId);
+        mockNft.approve(address(staker), tokenId);
         staker.stake(tokenId);
         vm.stopPrank();
 
@@ -563,7 +565,7 @@ contract SushiStakerTest is Test {
     }
 
     function test_RevertWhen_UnstakeNotStaked() public {
-        uint256 tokenId = mockNFT.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
 
         // Alice tries to unstake a token that was never staked
         vm.prank(alice);

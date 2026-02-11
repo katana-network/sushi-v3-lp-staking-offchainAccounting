@@ -1,47 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
-import {IAddressGaugeVoter} from "./interfaces/IAddressGaugeVoter.sol";
-
-/// @title Interface for the Nonfungible Position Manager
-/// @notice Minimal interface for interacting with Uniswap/SushiSwap V3 NFT positions
-/// @dev We use a minimal interface instead of the full INonfungiblePositionManager to avoid
-///      OpenZeppelin version conflicts between v4 (used by Uniswap) and v5 (used by this project)
-interface INonfungiblePositionManager {
-    struct CollectParams {
-        uint256 tokenId;
-        address recipient;
-        uint128 amount0Max;
-        uint128 amount1Max;
-    }
-
-    function positions(uint256 tokenId)
-        external
-        view
-        returns (
-            uint96 nonce,
-            address operator,
-            address token0,
-            address token1,
-            uint24 fee,
-            int24 tickLower,
-            int24 tickUpper,
-            uint128 liquidity,
-            uint256 feeGrowthInside0LastX128,
-            uint256 feeGrowthInside1LastX128,
-            uint128 tokensOwed0,
-            uint128 tokensOwed1
-        );
-
-    function collect(CollectParams calldata params) external payable returns (uint256 amount0, uint256 amount1);
-}
+import { IAddressGaugeVoter } from "./interfaces/IAddressGaugeVoter.sol";
+import { INonfungiblePositionManager } from "./interfaces/INonfungiblePositionManager.sol";
+import { Initializable } from "@openzeppelin-contracts-5.5.0/proxy/utils/Initializable.sol";
+import { IERC721 } from "@openzeppelin-contracts-5.5.0/token/ERC721/IERC721.sol";
+import { IERC721Receiver } from "@openzeppelin-contracts-5.5.0/token/ERC721/IERC721Receiver.sol";
+import { ReentrancyGuard } from "@openzeppelin-contracts-5.5.0/utils/ReentrancyGuard.sol";
+import { OwnableUpgradeable } from "@openzeppelin-contracts-upgradeable-5.5.0/access/OwnableUpgradeable.sol";
+import { IUniswapV3Factory } from "@sushiswap-v3-core/interfaces/IUniswapV3Factory.sol";
+import { IUniswapV3Pool } from "@sushiswap-v3-core/interfaces/IUniswapV3Pool.sol";
 
 /**
  * @title SushiStaker
@@ -108,7 +76,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
     /// @custom:storage-location erc7201:sushistaker.storage.main
     struct SushiStakerStorage {
         /// @notice The SushiSwap NFT contract address
-        INonfungiblePositionManager sushiNFT;
+        INonfungiblePositionManager sushiNft;
         /// @notice The Uniswap V3 Factory address
         IUniswapV3Factory factory;
         /// @notice The fee collector address
@@ -146,17 +114,17 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
 
     /**
      * @notice Initialize the contract
-     * @param _sushiNFT The SushiSwap NFT contract address
+     * @param _sushiNft The SushiSwap NFT contract address
      * @param _factory The Uniswap V3 Factory address
      * @param _feeCollector The fee collector address
      * @param _gaugeVoter The gauge voter address
      * @param _owner The owner of the contract
      */
-    function initialize(address _sushiNFT, address _factory, address _feeCollector, address _gaugeVoter, address _owner)
+    function initialize(address _sushiNft, address _factory, address _feeCollector, address _gaugeVoter, address _owner)
         external
         initializer
     {
-        if (_sushiNFT == address(0)) revert ZeroAddress();
+        if (_sushiNft == address(0)) revert ZeroAddress();
         if (_factory == address(0)) revert ZeroAddress();
         if (_feeCollector == address(0)) revert ZeroAddress();
         if (_gaugeVoter == address(0)) revert ZeroAddress();
@@ -165,7 +133,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         __Ownable_init(_owner);
 
         SushiStakerStorage storage $ = _getSushiStakerStorage();
-        $.sushiNFT = INonfungiblePositionManager(_sushiNFT);
+        $.sushiNft = INonfungiblePositionManager(_sushiNft);
         $.factory = IUniswapV3Factory(_factory);
         $.feeCollector = _feeCollector;
         $.gaugeVoter = _gaugeVoter;
@@ -187,12 +155,12 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         SushiStakerStorage storage $ = _getSushiStakerStorage();
 
         // Verify the NFT is from the correct contract and user owns it
-        if (IERC721(address($.sushiNFT)).ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
+        if (IERC721(address($.sushiNft)).ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
 
         // Transfer NFT to this contract
         // Note: This triggers onERC721Received, which detects the locked
         // reentrancy guard and returns early without double-staking
-        IERC721(address($.sushiNFT)).safeTransferFrom(msg.sender, address(this), tokenId);
+        IERC721(address($.sushiNft)).safeTransferFrom(msg.sender, address(this), tokenId);
 
         // Perform staking logic
         _stakeInternal(tokenId, msg.sender, $);
@@ -223,7 +191,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         delete $.stakeTimestamp[tokenId];
 
         // Transfer NFT back to user
-        IERC721(address($.sushiNFT)).safeTransferFrom(address(this), msg.sender, tokenId);
+        IERC721(address($.sushiNft)).safeTransferFrom(address(this), msg.sender, tokenId);
     }
 
     /**
@@ -256,10 +224,10 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
      */
     function _collectAndTransferFees(uint256 tokenId, address recipient, SushiStakerStorage storage $) private {
         // Get token addresses from position
-        (,, address token0, address token1, uint24 fee,,,,,,,) = $.sushiNFT.positions(tokenId);
+        (,, address token0, address token1, uint24 fee,,,,,,,) = $.sushiNft.positions(tokenId);
 
         // Collect all available fees directly to recipient
-        (uint256 amount0, uint256 amount1) = $.sushiNFT
+        (uint256 amount0, uint256 amount1) = $.sushiNft
             .collect(
                 INonfungiblePositionManager.CollectParams({
                     tokenId: tokenId, recipient: recipient, amount0Max: type(uint128).max, amount1Max: type(uint128).max
@@ -297,7 +265,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
      */
     function _emitStakeEvent(uint256 tokenId, address user, SushiStakerStorage storage $) private {
         (,, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity,,,,) =
-            $.sushiNFT.positions(tokenId);
+            $.sushiNft.positions(tokenId);
 
         // Verify position has liquidity
         if (liquidity == 0) revert ZeroLiquidity();
@@ -319,7 +287,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
      */
     function _emitUnstakeEvent(uint256 tokenId, address user, SushiStakerStorage storage $) private {
         (,, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity,,,,) =
-            $.sushiNFT.positions(tokenId);
+            $.sushiNft.positions(tokenId);
 
         // Get pool address
         address pool = $.factory.getPool(token0, token1, fee);
@@ -341,8 +309,8 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
      * @notice Get the SushiSwap NFT contract address
      * @return The NFT contract address
      */
-    function sushiNFT() external view returns (address) {
-        return address(_getSushiStakerStorage().sushiNFT);
+    function sushiNft() external view returns (address) {
+        return address(_getSushiStakerStorage().sushiNft);
     }
 
     /**
@@ -412,7 +380,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         returns (address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity)
     {
         SushiStakerStorage storage $ = _getSushiStakerStorage();
-        (,, token0, token1, fee, tickLower, tickUpper, liquidity,,,,) = $.sushiNFT.positions(tokenId);
+        (,, token0, token1, fee, tickLower, tickUpper, liquidity,,,,) = $.sushiNft.positions(tokenId);
     }
 
     // =============================================================
@@ -463,7 +431,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         SushiStakerStorage storage $ = _getSushiStakerStorage();
 
         // Only accept NFTs from the configured contract
-        if (msg.sender != address($.sushiNFT)) revert InvalidNFTContract();
+        if (msg.sender != address($.sushiNft)) revert InvalidNFTContract();
 
         // If reentrancy guard is locked, we're being called from stake()
         // Let stake() handle the staking logic

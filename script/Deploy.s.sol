@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {Script, console} from "forge-std/Script.sol";
-import {SushiStaker} from "../src/SushiStaker.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { SushiStaker } from "../src/SushiStaker.sol";
+import { ProxyAdmin } from "@openzeppelin-contracts-5.5.0/proxy/transparent/ProxyAdmin.sol";
+import {
+    TransparentUpgradeableProxy
+} from "@openzeppelin-contracts-5.5.0/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {
+    ITransparentUpgradeableProxy
+} from "@openzeppelin-contracts-5.5.0/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { Script, console } from "forge-std/Script.sol";
 
 /**
  * @title DeploySushiStaker
@@ -16,14 +20,14 @@ contract DeploySushiStaker is Script {
     function run() external {
         // Load environment variables
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address sushiNFT = vm.envAddress("SUSHI_NFT_CONTRACT");
+        address sushiNft = vm.envAddress("SUSHI_NFT_CONTRACT");
         address factory = vm.envAddress("FACTORY_CONTRACT");
         address feeCollector = vm.envAddress("FEE_COLLECTOR");
         address gaugeVoter = vm.envAddress("GAUGE_VOTER");
         address owner = vm.envAddress("OWNER_ADDRESS");
 
         console.log("Deploying SushiStaker...");
-        console.log("SushiSwap NFT Contract:", sushiNFT);
+        console.log("SushiSwap NFT Contract:", sushiNft);
         console.log("Factory Contract:", factory);
         console.log("Fee Collector:", feeCollector);
         console.log("Gauge Voter:", gaugeVoter);
@@ -41,7 +45,7 @@ contract DeploySushiStaker is Script {
 
         // Encode initialization data
         bytes memory initData =
-            abi.encodeWithSelector(SushiStaker.initialize.selector, sushiNFT, factory, feeCollector, gaugeVoter, owner);
+            abi.encodeWithSelector(SushiStaker.initialize.selector, sushiNft, factory, feeCollector, gaugeVoter, owner);
 
         // Deploy TransparentUpgradeableProxy
         TransparentUpgradeableProxy proxy =
@@ -52,7 +56,7 @@ contract DeploySushiStaker is Script {
 
         // Verify deployment
         SushiStaker staker = SushiStaker(address(proxy));
-        console.log("Verified SushiSwap NFT:", staker.sushiNFT());
+        console.log("Verified SushiSwap NFT:", staker.sushiNft());
         console.log("Verified Factory:", staker.factory());
         console.log("Verified Fee Collector:", staker.feeCollector());
 

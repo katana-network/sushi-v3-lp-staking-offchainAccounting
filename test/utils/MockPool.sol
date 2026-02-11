@@ -6,7 +6,7 @@ pragma solidity ^0.8.22;
  * @notice Mock Uniswap V3 Pool for testing
  */
 contract MockPool {
-    uint160 public mockSecondsPerLiquidity = 1000000;
+    uint160 public mockSecondsPerLiquidity = 1_000_000;
 
     function setMockSecondsPerLiquidity(uint160 value) external {
         mockSecondsPerLiquidity = value;

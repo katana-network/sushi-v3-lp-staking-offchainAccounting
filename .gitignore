@@ -19,3 +19,7 @@ docs/
 
 # IDE
 .vscode/
+
+
+# Soldeer
+/dependencies
