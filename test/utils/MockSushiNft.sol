@@ -34,8 +34,6 @@ contract MockSushiNft is ERC721 {
     }
 
     mapping(uint256 => Position) public positions;
-    mapping(uint256 => uint256) public pendingFees0;
-    mapping(uint256 => uint256) public pendingFees1;
 
     MockERC20 public immutable MOCK_TOKEN_0;
     MockERC20 public immutable MOCK_TOKEN_1;
@@ -75,21 +73,49 @@ contract MockSushiNft is ERC721 {
         return tokenId;
     }
 
+    /// @notice Add pending fees directly to tokensOwed (simulates fee accrual)
+    /// @dev In production, fees are calculated from pool state. This is a test helper.
     function addPendingFees(uint256 tokenId, uint256 amount0, uint256 amount1) external {
-        pendingFees0[tokenId] += amount0;
-        pendingFees1[tokenId] += amount1;
+        Position storage position = positions[tokenId];
+        
+        // Ensure values fit in uint128 before casting
+        require(amount0 <= type(uint128).max, "Amount0 overflow");
+        require(amount1 <= type(uint128).max, "Amount1 overflow");
+        
+        // casting to 'uint128' is safe because we checked above
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint128 fee0 = uint128(amount0);
+        // casting to 'uint128' is safe because we checked above
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint128 fee1 = uint128(amount1);
+        
+        // Check for overflow on addition
+        require(position.tokensOwed0 <= type(uint128).max - fee0, "TokensOwed0 overflow");
+        require(position.tokensOwed1 <= type(uint128).max - fee1, "TokensOwed1 overflow");
+        
+        position.tokensOwed0 += fee0;
+        position.tokensOwed1 += fee1;
     }
 
     function collect(CollectParams calldata params) external returns (uint256 amount0, uint256 amount1) {
-        amount0 = pendingFees0[params.tokenId];
-        amount1 = pendingFees1[params.tokenId];
+        Position storage position = positions[params.tokenId];
+        
+        // Determine how much to collect (min of requested and available)
+        amount0 = params.amount0Max > position.tokensOwed0 ? position.tokensOwed0 : params.amount0Max;
+        amount1 = params.amount1Max > position.tokensOwed1 ? position.tokensOwed1 : params.amount1Max;
 
-        if (amount0 > params.amount0Max) amount0 = params.amount0Max;
-        if (amount1 > params.amount1Max) amount1 = params.amount1Max;
+        // casting to 'uint128' is safe because amount0/1 are capped by tokensOwed0/1 which are uint128
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint128 collect0 = uint128(amount0);
+        // casting to 'uint128' is safe because amount1 is capped by tokensOwed1 which is uint128
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint128 collect1 = uint128(amount1);
 
-        pendingFees0[params.tokenId] -= amount0;
-        pendingFees1[params.tokenId] -= amount1;
+        // Decrease tokensOwed by collected amount
+        position.tokensOwed0 -= collect0;
+        position.tokensOwed1 -= collect1;
 
+        // Mint tokens to recipient (simulates transferring from pool)
         if (amount0 > 0) {
             MOCK_TOKEN_0.mint(params.recipient, amount0);
         }

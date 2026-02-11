@@ -2,241 +2,18 @@
 pragma solidity ^0.8.22;
 
 import { SushiStaker } from "../src/SushiStaker.sol";
+import { MockERC20 } from "./utils/MockERC20.sol";
+import { SushiStakerTestBase } from "./utils/SushiStakerTestBase.sol";
 import { ProxyAdmin } from "@openzeppelin-contracts-5.5.0/proxy/transparent/ProxyAdmin.sol";
 import {
     TransparentUpgradeableProxy
 } from "@openzeppelin-contracts-5.5.0/proxy/transparent/TransparentUpgradeableProxy.sol";
-import { ERC20 } from "@openzeppelin-contracts-5.5.0/token/ERC20/ERC20.sol";
-import { ERC721 } from "@openzeppelin-contracts-5.5.0/token/ERC721/ERC721.sol";
-import { Test } from "forge-std/Test.sol";
-
-/**
- * @title MockERC20
- * @notice Mock ERC20 for testing
- */
-contract MockERC20 is ERC20 {
-    constructor(string memory name, string memory symbol) ERC20(name, symbol) { }
-
-    function mint(address to, uint256 amount) external {
-        _mint(to, amount);
-    }
-}
-
-/**
- * @title MockSushiNft
- * @notice Mock ERC721 with positions() and collect() for testing
- */
-contract MockSushiNft is ERC721 {
-    uint256 private _tokenIdCounter;
-
-    struct Position {
-        uint96 nonce;
-        address operator;
-        address token0;
-        address token1;
-        uint24 fee;
-        int24 tickLower;
-        int24 tickUpper;
-        uint128 liquidity;
-        uint256 feeGrowthInside0LastX128;
-        uint256 feeGrowthInside1LastX128;
-        uint128 tokensOwed0;
-        uint128 tokensOwed1;
-    }
-
-    struct CollectParams {
-        uint256 tokenId;
-        address recipient;
-        uint128 amount0Max;
-        uint128 amount1Max;
-    }
-
-    mapping(uint256 => Position) public positions;
-    mapping(uint256 => uint256) public pendingFees0;
-    mapping(uint256 => uint256) public pendingFees1;
-
-    MockERC20 public immutable MOCK_TOKEN_0;
-    MockERC20 public immutable MOCK_TOKEN_1;
-
-    constructor() ERC721("SushiSwap V3 Positions", "SUSHI-V3-POS") {
-        MOCK_TOKEN_0 = new MockERC20("Token0", "TK0");
-        MOCK_TOKEN_1 = new MockERC20("Token1", "TK1");
-    }
-
-    function mint(
-        address to,
-        address token0,
-        address token1,
-        uint24 fee,
-        int24 tickLower,
-        int24 tickUpper,
-        uint128 liquidity
-    ) external returns (uint256) {
-        uint256 tokenId = _tokenIdCounter++;
-        _mint(to, tokenId);
-
-        positions[tokenId] = Position({
-            nonce: 0,
-            operator: address(0),
-            token0: token0,
-            token1: token1,
-            fee: fee,
-            tickLower: tickLower,
-            tickUpper: tickUpper,
-            liquidity: liquidity,
-            feeGrowthInside0LastX128: 0,
-            feeGrowthInside1LastX128: 0,
-            tokensOwed0: 0,
-            tokensOwed1: 0
-        });
-
-        return tokenId;
-    }
-
-    function addPendingFees(uint256 tokenId, uint256 amount0, uint256 amount1) external {
-        pendingFees0[tokenId] += amount0;
-        pendingFees1[tokenId] += amount1;
-    }
-
-    function collect(CollectParams calldata params) external returns (uint256 amount0, uint256 amount1) {
-        amount0 = pendingFees0[params.tokenId];
-        amount1 = pendingFees1[params.tokenId];
-
-        if (amount0 > params.amount0Max) amount0 = params.amount0Max;
-        if (amount1 > params.amount1Max) amount1 = params.amount1Max;
-
-        pendingFees0[params.tokenId] -= amount0;
-        pendingFees1[params.tokenId] -= amount1;
-
-        if (amount0 > 0) {
-            MOCK_TOKEN_0.mint(params.recipient, amount0);
-        }
-        if (amount1 > 0) {
-            MOCK_TOKEN_1.mint(params.recipient, amount1);
-        }
-
-        return (amount0, amount1);
-    }
-
-    function getToken0() external view returns (address) {
-        return address(MOCK_TOKEN_0);
-    }
-
-    function getToken1() external view returns (address) {
-        return address(MOCK_TOKEN_1);
-    }
-}
-
-/**
- * @title MockFactory
- * @notice Mock factory for testing
- */
-contract MockFactory {
-    mapping(address => mapping(address => mapping(uint24 => address))) public pools;
-
-    function setPool(address token0, address token1, uint24 fee, address pool) external {
-        pools[token0][token1][fee] = pool;
-        pools[token1][token0][fee] = pool;
-    }
-
-    function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address) {
-        return pools[tokenA][tokenB][fee];
-    }
-}
-
-/**
- * @title MockPool
- * @notice Mock pool for testing
- */
-contract MockPool {
-    uint160 public mockSecondsPerLiquidity = 1_000_000;
-
-    function setMockSecondsPerLiquidity(uint160 value) external {
-        mockSecondsPerLiquidity = value;
-    }
-
-    function snapshotCumulativesInside(int24, int24)
-        external
-        view
-        returns (int56 tickCumulativeInside, uint160 secondsPerLiquidityInsideX128, uint32 secondsInside)
-    {
-        return (0, mockSecondsPerLiquidity, 0);
-    }
-}
-
-/**
- * @title MockGaugeVoter
- * @notice Mock gauge voter for testing
- */
-contract MockGaugeVoter {
-    uint256 public epochId = 1;
-
-    function setEpochId(uint256 _epochId) external {
-        epochId = _epochId;
-    }
-}
 
 /**
  * @title SushiStakerTest
  * @notice Test suite for SushiStaker contract
  */
-contract SushiStakerTest is Test {
-    SushiStaker public implementation;
-    SushiStaker public staker;
-    ProxyAdmin public proxyAdmin;
-    TransparentUpgradeableProxy public proxy;
-    MockSushiNft public mockNft;
-    MockFactory public mockFactory;
-    MockPool public mockPool;
-    MockGaugeVoter public mockGaugeVoter;
-
-    address public owner = makeAddr("owner");
-    address public feeCollector = makeAddr("feeCollector");
-    address public alice = makeAddr("alice");
-    address public bob = makeAddr("bob");
-
-    address public token0;
-    address public token1;
-    uint24 public constant FEE = 3000;
-    int24 public constant TICK_LOWER = -100;
-    int24 public constant TICK_UPPER = 100;
-    uint128 public constant LIQUIDITY = 1_000_000;
-
-    function setUp() public {
-        // Deploy mocks
-        mockNft = new MockSushiNft();
-        mockFactory = new MockFactory();
-        mockPool = new MockPool();
-        mockGaugeVoter = new MockGaugeVoter();
-
-        token0 = mockNft.getToken0();
-        token1 = mockNft.getToken1();
-
-        // Setup factory to return pool
-        mockFactory.setPool(token0, token1, FEE, address(mockPool));
-
-        // Deploy implementation
-        implementation = new SushiStaker();
-
-        // Deploy ProxyAdmin
-        proxyAdmin = new ProxyAdmin(owner);
-
-        // Encode initialization data
-        bytes memory initData = abi.encodeWithSelector(
-            SushiStaker.initialize.selector,
-            address(mockNft),
-            address(mockFactory),
-            feeCollector,
-            address(mockGaugeVoter),
-            owner
-        );
-
-        // Deploy proxy
-        proxy = new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
-
-        // Get staker instance
-        staker = SushiStaker(address(proxy));
-    }
+contract SushiStakerTest is SushiStakerTestBase {
 
     // =============================================================
     //                     EIP-7201 STORAGE TESTS
@@ -491,6 +268,186 @@ contract SushiStakerTest is Test {
         vm.prank(alice);
         vm.expectRevert();
         staker.setGaugeVoter(newGaugeVoter);
+    }
+
+    function test_RevertWhen_SetGaugeVoterZeroAddress() public {
+        vm.prank(owner);
+        vm.expectRevert(SushiStaker.ZeroAddress.selector);
+        staker.setGaugeVoter(address(0));
+    }
+
+    // =============================================================
+    //                    FEE STATS TESTS
+    // =============================================================
+
+    function test_CollectFeesMultipleStats_EmptyArray() public view {
+        uint256[] memory tokenIds = new uint256[](0);
+
+        SushiStaker.FeeStats memory stats = staker.collectFeesMultipleStats(tokenIds);
+
+        assertEq(stats.totalTokensOwed0, 0);
+        assertEq(stats.totalTokensOwed1, 0);
+        assertEq(stats.stakedTokensCount, 0);
+        assertEq(stats.unstakedTokensCount, 0);
+        assertEq(stats.totalLiquidity, 0);
+        assertEq(stats.unstakedTokenIds.length, 0);
+    }
+
+    function test_CollectFeesMultipleStats_SingleStakedToken() public {
+        uint256 tokenId = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+
+        vm.startPrank(alice);
+        mockNft.approve(address(staker), tokenId);
+        staker.stake(tokenId);
+        vm.stopPrank();
+
+        // Add pending fees
+        mockNft.addPendingFees(tokenId, 100 ether, 50 ether);
+
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = tokenId;
+
+        SushiStaker.FeeStats memory stats = staker.collectFeesMultipleStats(tokenIds);
+
+        assertEq(stats.totalTokensOwed0, 100 ether);
+        assertEq(stats.totalTokensOwed1, 50 ether);
+        assertEq(stats.stakedTokensCount, 1);
+        assertEq(stats.unstakedTokensCount, 0);
+        assertEq(stats.totalLiquidity, LIQUIDITY);
+        assertEq(stats.unstakedTokenIds.length, 0);
+    }
+
+    function test_CollectFeesMultipleStats_MultipleStakedTokens() public {
+        uint256 tokenId1 = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId2 = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY * 2);
+        uint256 tokenId3 = mockNft.mint(bob, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY * 3);
+
+        // Stake all tokens
+        vm.startPrank(alice);
+        mockNft.approve(address(staker), tokenId1);
+        mockNft.approve(address(staker), tokenId2);
+        staker.stake(tokenId1);
+        staker.stake(tokenId2);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        mockNft.approve(address(staker), tokenId3);
+        staker.stake(tokenId3);
+        vm.stopPrank();
+
+        // Add different fees to each position
+        mockNft.addPendingFees(tokenId1, 100 ether, 50 ether);
+        mockNft.addPendingFees(tokenId2, 200 ether, 100 ether);
+        mockNft.addPendingFees(tokenId3, 300 ether, 150 ether);
+
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = tokenId1;
+        tokenIds[1] = tokenId2;
+        tokenIds[2] = tokenId3;
+
+        SushiStaker.FeeStats memory stats = staker.collectFeesMultipleStats(tokenIds);
+
+        assertEq(stats.totalTokensOwed0, 600 ether); // 100 + 200 + 300
+        assertEq(stats.totalTokensOwed1, 300 ether); // 50 + 100 + 150
+        assertEq(stats.stakedTokensCount, 3);
+        assertEq(stats.unstakedTokensCount, 0);
+        assertEq(stats.totalLiquidity, LIQUIDITY + LIQUIDITY * 2 + LIQUIDITY * 3); // 1M + 2M + 3M = 6M
+        assertEq(stats.unstakedTokenIds.length, 0);
+    }
+
+    function test_CollectFeesMultipleStats_MixedStakedAndUnstaked() public {
+        uint256 tokenId1 = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId2 = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId3 = mockNft.mint(bob, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+
+        // Only stake tokenId1 and tokenId3
+        vm.startPrank(alice);
+        mockNft.approve(address(staker), tokenId1);
+        staker.stake(tokenId1);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        mockNft.approve(address(staker), tokenId3);
+        staker.stake(tokenId3);
+        vm.stopPrank();
+
+        // Add fees (tokenId2 is not staked)
+        mockNft.addPendingFees(tokenId1, 100 ether, 50 ether);
+        mockNft.addPendingFees(tokenId2, 999 ether, 999 ether); // Should not be counted
+        mockNft.addPendingFees(tokenId3, 200 ether, 100 ether);
+
+        uint256[] memory tokenIds = new uint256[](3);
+        tokenIds[0] = tokenId1;
+        tokenIds[1] = tokenId2; // Not staked
+        tokenIds[2] = tokenId3;
+
+        SushiStaker.FeeStats memory stats = staker.collectFeesMultipleStats(tokenIds);
+
+        assertEq(stats.totalTokensOwed0, 300 ether); // Only from staked tokens
+        assertEq(stats.totalTokensOwed1, 150 ether); // Only from staked tokens
+        assertEq(stats.stakedTokensCount, 2);
+        assertEq(stats.unstakedTokensCount, 1);
+        assertEq(stats.totalLiquidity, LIQUIDITY * 2);
+        
+        // Verify unstaked token ID is correctly identified
+        assertEq(stats.unstakedTokenIds.length, 1);
+        assertEq(stats.unstakedTokenIds[0], tokenId2);
+    }
+
+    function test_CollectFeesMultipleStats_AllUnstaked() public {
+        uint256 tokenId1 = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId2 = mockNft.mint(bob, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+
+        // Add fees but don't stake
+        mockNft.addPendingFees(tokenId1, 100 ether, 50 ether);
+        mockNft.addPendingFees(tokenId2, 200 ether, 100 ether);
+
+        uint256[] memory tokenIds = new uint256[](2);
+        tokenIds[0] = tokenId1;
+        tokenIds[1] = tokenId2;
+
+        SushiStaker.FeeStats memory stats = staker.collectFeesMultipleStats(tokenIds);
+
+        assertEq(stats.totalTokensOwed0, 0); // No staked tokens
+        assertEq(stats.totalTokensOwed1, 0); // No staked tokens
+        assertEq(stats.stakedTokensCount, 0);
+        assertEq(stats.unstakedTokensCount, 2);
+        assertEq(stats.totalLiquidity, 0);
+        
+        // Verify all unstaked token IDs are returned
+        assertEq(stats.unstakedTokenIds.length, 2);
+        assertEq(stats.unstakedTokenIds[0], tokenId1);
+        assertEq(stats.unstakedTokenIds[1], tokenId2);
+    }
+
+    function test_CollectFeesMultipleStats_NoFees() public {
+        uint256 tokenId1 = mockNft.mint(alice, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+        uint256 tokenId2 = mockNft.mint(bob, token0, token1, FEE, TICK_LOWER, TICK_UPPER, LIQUIDITY);
+
+        vm.startPrank(alice);
+        mockNft.approve(address(staker), tokenId1);
+        staker.stake(tokenId1);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        mockNft.approve(address(staker), tokenId2);
+        staker.stake(tokenId2);
+        vm.stopPrank();
+
+        // No fees added
+
+        uint256[] memory tokenIds = new uint256[](2);
+        tokenIds[0] = tokenId1;
+        tokenIds[1] = tokenId2;
+
+        SushiStaker.FeeStats memory stats = staker.collectFeesMultipleStats(tokenIds);
+
+        assertEq(stats.totalTokensOwed0, 0);
+        assertEq(stats.totalTokensOwed1, 0);
+        assertEq(stats.stakedTokensCount, 2);
+        assertEq(stats.unstakedTokensCount, 0);
+        assertEq(stats.totalLiquidity, LIQUIDITY * 2);
+        assertEq(stats.unstakedTokenIds.length, 0);
     }
 
     // =============================================================

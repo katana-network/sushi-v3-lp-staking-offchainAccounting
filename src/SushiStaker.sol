@@ -383,6 +383,58 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         (,, token0, token1, fee, tickLower, tickUpper, liquidity,,,,) = $.sushiNft.positions(tokenId);
     }
 
+    /**
+     * @notice Fee collection statistics for multiple positions
+     * @dev Used by backend to preview fees before calling collectFeesMultiple
+     */
+    struct FeeStats {
+        uint256 totalTokensOwed0; // Total token0 fees available to collect
+        uint256 totalTokensOwed1; // Total token1 fees available to collect
+        uint256 stakedTokensCount; // Number of staked tokens in the provided array
+        uint256 unstakedTokensCount; // Number of unstaked tokens in the provided array
+        uint256 totalLiquidity; // Total liquidity across all staked positions
+        uint256[] unstakedTokenIds; // Array of token IDs that are not staked
+    }
+
+    /**
+     * @notice Get cumulative fee collection statistics for multiple token IDs
+     * @dev This is a view function to check fees before calling collectFeesMultiple
+     * @param tokenIds Array of token IDs to check
+     * @return stats Cumulative statistics including total fees, counts, liquidity, and unstaked token IDs
+     */
+    function collectFeesMultipleStats(uint256[] calldata tokenIds) external view returns (FeeStats memory stats) {
+        SushiStakerStorage storage $ = _getSushiStakerStorage();
+
+        // Allocate at max possible size, will be trimmed after the loop
+        stats.unstakedTokenIds = new uint256[](tokenIds.length);
+
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            uint256 tokenId = tokenIds[i];
+
+            // Check if token is staked
+            if ($.tokenStaker[tokenId] != address(0)) {
+                stats.stakedTokensCount++;
+
+                // Get position data including tokensOwed
+                (,,,,,,, uint128 liquidity,,, uint128 tokensOwed0, uint128 tokensOwed1) =
+                    $.sushiNft.positions(tokenId);
+
+                // Accumulate fees and liquidity
+                stats.totalTokensOwed0 += tokensOwed0;
+                stats.totalTokensOwed1 += tokensOwed1;
+                stats.totalLiquidity += liquidity;
+            } else {
+                stats.unstakedTokenIds[stats.unstakedTokensCount] = tokenId;
+                stats.unstakedTokensCount++;
+            }
+        }
+
+        // Trim the array to actual size
+        assembly {
+            mstore(mload(add(stats, 160)), mload(add(stats, 96)))
+        }
+    }
+
     // =============================================================
     //                      ADMIN FUNCTIONS
     // =============================================================
@@ -406,6 +458,8 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
      * @param _gaugeVoter The new gauge voter address
      */
     function setGaugeVoter(address _gaugeVoter) external onlyOwner {
+        if (_gaugeVoter == address(0)) revert ZeroAddress();
+
         SushiStakerStorage storage $ = _getSushiStakerStorage();
         address oldGaugeVoter = $.gaugeVoter;
         $.gaugeVoter = _gaugeVoter;
