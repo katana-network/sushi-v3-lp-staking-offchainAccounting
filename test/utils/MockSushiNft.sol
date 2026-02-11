@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity 0.8.33;
 
 import { MockERC20 } from "./MockERC20.sol";
 import { ERC721 } from "@openzeppelin-contracts-5.5.0/token/ERC721/ERC721.sol";

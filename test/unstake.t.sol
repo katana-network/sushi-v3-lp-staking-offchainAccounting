@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity 0.8.33;
 
 import { SushiStaker } from "../src/SushiStaker.sol";
 import { MockERC20 } from "./utils/MockERC20.sol";

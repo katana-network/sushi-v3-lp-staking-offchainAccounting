@@ -20,6 +20,9 @@ docs/
 # IDE
 .vscode/
 
-
 # Soldeer
 /dependencies
+
+# Tests Coverage
+.coverage/
+lcov.info
