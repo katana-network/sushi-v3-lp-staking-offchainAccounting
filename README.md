@@ -44,14 +44,23 @@ User → TransparentUpgradeableProxy → SushiStaker Implementation
 
 ### Batch Collection
 - `collectFeesMultiple(tokenIds[])` can be called by anyone
-- Collects fees from multiple staked positions
+- Collects fees from multiple staked positions (skips unstaked tokens)
 - All fees sent to `feeCollector`
+
+### Fee Preview (New)
+- `collectFeesMultipleStats(tokenIds[])` - View function for backend integration
+- Returns cumulative statistics:
+  - `totalTokensOwed0/1`: Total collectable fees
+  - `stakedTokensCount/unstakedTokensCount`: Number of staked/unstaked tokens
+  - `totalLiquidity`: Sum of liquidity across staked positions
+  - `unstakedTokenIds[]`: Array of token IDs that are not staked
+- Use this to preview fees before calling `collectFeesMultiple`
 
 ## Installation & Setup
 
 ```bash
-# Clone and install dependencies
-forge install
+# Install dependencies (using soldeer)
+forge soldeer install
 
 # Build contracts
 forge build
@@ -59,6 +68,8 @@ forge build
 # Run tests
 forge test
 ```
+
+**Note**: This project uses [Soldeer](https://soldeer.xyz/) for dependency management instead of git submodules.
 
 ## Deployment
 
@@ -74,6 +85,7 @@ cp .env.example .env
 - `SUSHI_NFT_CONTRACT`: SushiSwap NFT Position Manager address
 - `FACTORY_CONTRACT`: SushiSwap V3 Factory address
 - `FEE_COLLECTOR`: Address to receive collected fees
+- `GAUGE_VOTER`: Address of the gauge voter contract
 - `OWNER_ADDRESS`: Contract owner (admin functions)
 - `RPC_URL`: Network RPC endpoint
 
@@ -109,6 +121,7 @@ forge script script/Deploy.s.sol:UpgradeSushiStaker \
 | `stake(uint256 tokenId)` | Stake NFT position (requires approval first) |
 | `unstake(uint256 tokenId)` | Unstake position (only original staker) |
 | `collectFeesMultiple(uint256[] tokenIds)` | Batch collect fees (public) |
+| `collectFeesMultipleStats(uint256[] tokenIds)` | View function to preview fees before collection |
 
 ### View Functions
 
@@ -117,16 +130,19 @@ forge script script/Deploy.s.sol:UpgradeSushiStaker \
 | `sushiNFT()` | NFT contract address |
 | `factory()` | Factory contract address |
 | `feeCollector()` | Fee collector address |
+| `gaugeVoter()` | Gauge voter contract address |
 | `getStaker(uint256 tokenId)` | Staker address (or address(0)) |
 | `getStakeTimestamp(uint256 tokenId)` | Unix timestamp of stake |
 | `isStaked(uint256 tokenId)` | Boolean staking status |
 | `getPositionInfo(uint256 tokenId)` | Position details (tokens, ticks, liquidity) |
+| `collectFeesMultipleStats(uint256[] tokenIds)` | Preview stats (fees, counts, liquidity, unstaked IDs) |
 
 ### Admin Functions (Owner Only)
 
 | Function | Description |
 |----------|-------------|
-| `setFeeCollector(address)` | Update fee collector address |
+| `setFeeCollector(address)` | Update fee collector address (cannot be zero) |
+| `setGaugeVoter(address)` | Update gauge voter address (cannot be zero) |
 
 ## Events
 
@@ -170,6 +186,16 @@ event FeesCollected(
 );
 ```
 
+**FeeCollectorUpdated**: Emitted when fee collector is changed
+```solidity
+event FeeCollectorUpdated(address oldCollector, address newCollector);
+```
+
+**GaugeVoterUpdated**: Emitted when gauge voter is changed
+```solidity
+event GaugeVoterUpdated(address oldVoter, address newVoter);
+```
+
 ## Off-Chain Reward Calculation
 
 The contract emits detailed events for off-chain systems to calculate rewards:
@@ -201,7 +227,7 @@ const userReward = totalRewardPool * rewardShare;
 | `NotTokenOwner()` | Caller doesn't own NFT being staked |
 | `TokenNotStaked()` | Attempting to unstake non-staked token |
 | `NotTokenStaker()` | Caller is not the original staker |
-| `ZeroAddress()` | Zero address provided in initialization |
+| `ZeroAddress()` | Zero address provided (initialization, setFeeCollector, setGaugeVoter) |
 | `ZeroLiquidity()` | Position has no liquidity |
 
 ## Security Features
@@ -210,6 +236,7 @@ const userReward = totalRewardPool * rewardShare;
 - **Authorization**: Only original staker can unstake
 - **Reentrancy Protection**: ReentrancyGuard on all state-changing functions
 - **Safe Transfers**: SafeERC20 for token transfers
+- **Zero Address Protection**: Validation on critical addresses (feeCollector, gaugeVoter)
 - **Upgradeability**: EIP-7201 namespaced storage prevents collisions
 
 
@@ -233,9 +260,13 @@ forge test --match-test test_Stake
 - Initialization and upgrades
 - Stake/unstake flows
 - Fee collection (pre-stake, post-stake, batch)
-- Error conditions
-- Admin functions
+- Fee statistics preview (`collectFeesMultipleStats`)
+- Error conditions (zero addresses, zero liquidity, authorization)
+- Admin functions (setFeeCollector, setGaugeVoter)
+- Direct NFT transfers (auto-staking via `onERC721Received`)
 - EIP-7201 storage verification
+
+**Test Results:** 41 tests passing across 3 test suites
 
 ## License
 
