@@ -1,9 +1,7 @@
-@openzeppelin-contracts-3.4.2-solc-0.7/=dependencies/@openzeppelin-contracts-3.4.2-solc-0.7/
+@openzeppelin/contracts/=dependencies/@openzeppelin-contracts-5.5.0/
 @openzeppelin-contracts-5.5.0/=dependencies/@openzeppelin-contracts-5.5.0/
 @openzeppelin-contracts-upgradeable-5.5.0/=dependencies/@openzeppelin-contracts-upgradeable-5.5.0/
-@sushiswap-v3-core-v1/=dependencies/@sushiswap-v3-core-v1/
 @sushiswap-v3-core/=dependencies/@sushiswap-v3-core-v1/contracts/
-@sushiswap-v3-periphery-v1/=dependencies/@sushiswap-v3-periphery-v1/contracts/
-@sushiswap-v3-periphery/=dependencies/@sushiswap-v3-periphery-v1/contracts/
-forge-std-1.14.0/=dependencies/forge-std-1.14.0/src/
 forge-std/=dependencies/forge-std-1.14.0/src/
+@sushiswap-v3-core-v1/=dependencies/@sushiswap-v3-core-v1/
+forge-std-1.14.0/=dependencies/forge-std-1.14.0/src/
