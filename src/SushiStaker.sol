@@ -2,6 +2,7 @@
 pragma solidity ^0.8.22;
 
 import { IAddressGaugeVoter } from "./interfaces/IAddressGaugeVoter.sol";
+import { INonfungiblePositionManager } from "./interfaces/INonfungiblePositionManager.sol";
 import { Initializable } from "@openzeppelin-contracts-5.5.0/proxy/utils/Initializable.sol";
 import { IERC721 } from "@openzeppelin-contracts-5.5.0/token/ERC721/IERC721.sol";
 import { IERC721Receiver } from "@openzeppelin-contracts-5.5.0/token/ERC721/IERC721Receiver.sol";
@@ -9,7 +10,6 @@ import { ReentrancyGuard } from "@openzeppelin-contracts-5.5.0/utils/ReentrancyG
 import { OwnableUpgradeable } from "@openzeppelin-contracts-upgradeable-5.5.0/access/OwnableUpgradeable.sol";
 import { IUniswapV3Factory } from "@sushiswap-v3-core/interfaces/IUniswapV3Factory.sol";
 import { IUniswapV3Pool } from "@sushiswap-v3-core/interfaces/IUniswapV3Pool.sol";
-import { INonfungiblePositionManager } from "./interfaces/INonfungiblePositionManager.sol";
 
 /**
  * @title SushiStaker
