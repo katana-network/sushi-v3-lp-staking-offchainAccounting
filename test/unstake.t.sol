@@ -96,25 +96,33 @@ contract UnstakeTest is SushiStakerTestBase {
     }
 
     /**
-     * @notice Test that sending an NFT to staker during unstake callback reverts
-     * @dev Regression test: without the _staking flag fix, onERC721Received would
-     *      silently accept NFTs during unstake (reentrancy guard entered), leaving
-     *      them stuck in the contract with no staking record.
+     * @notice Test that sending an NFT to staker during unstake callback properly stakes it
+     * @dev Regression test: a previous implementation silently accepted NFTs during unstake
+     *      without creating staking records, leaving them stuck. Now onERC721Received always
+     *      calls _stakeInternal, so the new NFT is properly staked.
      */
-    function test_revertWhen_reentrancySendNftDuringUnstake() public {
+    function test_sendNftDuringUnstakeCallbackStakesProperly() public {
         ReentrancyAttacker attacker = new ReentrancyAttacker(staker, mockNft);
 
         // Mint two NFTs to the attacker contract
         uint256 stakedTokenId = _mintNft(address(attacker));
-        uint256 attackTokenId = _mintNft(address(attacker));
+        uint256 newTokenId = _mintNft(address(attacker));
 
-        // Attacker stakes the first NFT
+        // Stake the first NFT
         attacker.stakeToken(stakedTokenId);
         assertEq(staker.isStaked(stakedTokenId), true);
 
-        // Attacker unstakes — callback tries to send the second NFT to staker
-        // This should revert because onERC721Received rejects transfers during reentrancy
-        vm.expectRevert(SushiStaker.SushiStakerInvalidNFTContract.selector);
-        attacker.unstakeWithAttack(stakedTokenId, attackTokenId);
+        // Unstake — callback sends the second NFT to staker during unstake
+        attacker.unstakeWithAttack(stakedTokenId, newTokenId);
+
+        // The unstaked NFT should be fully unstaked
+        assertEq(staker.isStaked(stakedTokenId), false);
+        assertEq(staker.getStaker(stakedTokenId), address(0));
+        assertEq(mockNft.ownerOf(stakedTokenId), address(attacker));
+
+        // The new NFT sent during the callback should be properly staked
+        assertEq(staker.isStaked(newTokenId), true);
+        assertEq(staker.getStaker(newTokenId), address(attacker));
+        assertEq(mockNft.ownerOf(newTokenId), address(staker));
     }
 }
