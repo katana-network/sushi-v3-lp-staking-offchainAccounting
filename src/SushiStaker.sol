@@ -142,12 +142,6 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
     bytes32 private constant SUSHI_STAKER_STORAGE_LOCATION =
         0xb440148b1c334507c0052c0f23ea4ea76d9ce3c5acb0c2d6dee0a0b55e066300;
 
-    /**
-     * @dev Flag set during stake() to allow onERC721Received to accept the transfer without staking.
-     *      Uses transient storage (EIP-1153) — automatically cleared at end of transaction.
-     */
-    bool private transient _staking;
-
     function _getSushiStakerStorage() private pure returns (SushiStakerStorage storage $) {
         assembly {
             $.slot := SUSHI_STAKER_STORAGE_LOCATION
@@ -213,8 +207,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         if (IERC721(address($.sushiNft)).ownerOf(tokenId) != msg.sender) revert SushiStakerNotTokenOwner();
 
         // Transfer NFT to this contract
-        // Note: This triggers onERC721Received, which detects the _staking
-        // flag and returns early without double-staking
+        // Note: This triggers onERC721Received, which run the staking logic
         IERC721(address($.sushiNft)).safeTransferFrom(msg.sender, address(this), tokenId);
     }
 
