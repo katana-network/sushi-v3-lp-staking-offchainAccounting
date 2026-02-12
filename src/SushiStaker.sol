@@ -142,6 +142,12 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
     bytes32 private constant SUSHI_STAKER_STORAGE_LOCATION =
         0xb440148b1c334507c0052c0f23ea4ea76d9ce3c5acb0c2d6dee0a0b55e066300;
 
+    /**
+     * @dev Flag set during stake() to allow onERC721Received to accept the transfer without staking.
+     *      Uses transient storage (EIP-1153) — automatically cleared at end of transaction.
+     */
+    bool private transient _staking;
+
     function _getSushiStakerStorage() private pure returns (SushiStakerStorage storage $) {
         assembly {
             $.slot := SUSHI_STAKER_STORAGE_LOCATION
@@ -207,9 +213,11 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         if (IERC721(address($.sushiNft)).ownerOf(tokenId) != msg.sender) revert SushiStakerNotTokenOwner();
 
         // Transfer NFT to this contract
-        // Note: This triggers onERC721Received, which detects the locked
-        // reentrancy guard and returns early without double-staking
+        // Note: This triggers onERC721Received, which detects the _staking
+        // flag and returns early without double-staking
+        _staking = true;
         IERC721(address($.sushiNft)).safeTransferFrom(msg.sender, address(this), tokenId);
+        _staking = false;
 
         // Perform staking logic
         _stakeInternal(tokenId, msg.sender, $);
@@ -522,7 +530,7 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
     /**
      * @notice Handle the receipt of an NFT
      * @dev Automatically stakes NFTs sent directly from users.
-     *      When called from stake(), the reentrancy guard is locked,
+     *      When called from stake(), the _staking flag is set,
      *      so we detect that and return early (stake() handles staking).
      */
     function onERC721Received(address, address from, uint256 tokenId, bytes calldata)
@@ -535,11 +543,15 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         // Only accept NFTs from the configured contract
         if (msg.sender != address($.sushiNft)) revert SushiStakerInvalidNFTContract();
 
-        // If reentrancy guard is locked, we're being called from stake()
+        // If _staking flag is set, we're being called from stake()
         // Let stake() handle the staking logic
-        if (_reentrancyGuardEntered()) {
+        if (_staking) {
             return IERC721Receiver.onERC721Received.selector;
         }
+
+        // Reject transfers during reentrancy (e.g., from unstake() callbacks)
+        // to prevent NFTs being accepted without proper staking records
+        if (_reentrancyGuardEntered()) revert SushiStakerInvalidNFTContract();
 
         // Direct transfer - validate sender is not zero (prevents minting to contract)
         if (from == address(0)) revert SushiStakerZeroAddress();

@@ -3,6 +3,7 @@ pragma solidity 0.8.33;
 
 import { SushiStaker } from "../src/SushiStaker.sol";
 import { MockERC20 } from "./utils/MockERC20.sol";
+import { ReentrancyAttacker } from "./utils/ReentrancyAttacker.sol";
 import { SushiStakerTestBase } from "./utils/SushiStakerTestBase.sol";
 
 /**
@@ -92,5 +93,28 @@ contract UnstakeTest is SushiStakerTestBase {
         vm.prank(alice);
         vm.expectRevert(SushiStaker.SushiStakerTokenNotStaked.selector);
         staker.unstake(tokenId);
+    }
+
+    /**
+     * @notice Test that sending an NFT to staker during unstake callback reverts
+     * @dev Regression test: without the _staking flag fix, onERC721Received would
+     *      silently accept NFTs during unstake (reentrancy guard entered), leaving
+     *      them stuck in the contract with no staking record.
+     */
+    function test_revertWhen_reentrancySendNftDuringUnstake() public {
+        ReentrancyAttacker attacker = new ReentrancyAttacker(staker, mockNft);
+
+        // Mint two NFTs to the attacker contract
+        uint256 stakedTokenId = _mintNft(address(attacker));
+        uint256 attackTokenId = _mintNft(address(attacker));
+
+        // Attacker stakes the first NFT
+        attacker.stakeToken(stakedTokenId);
+        assertEq(staker.isStaked(stakedTokenId), true);
+
+        // Attacker unstakes — callback tries to send the second NFT to staker
+        // This should revert because onERC721Received rejects transfers during reentrancy
+        vm.expectRevert(SushiStaker.SushiStakerInvalidNFTContract.selector);
+        attacker.unstakeWithAttack(stakedTokenId, attackTokenId);
     }
 }
