@@ -3,6 +3,7 @@ pragma solidity 0.8.33;
 
 import { SushiStaker } from "../src/SushiStaker.sol";
 import { MockERC20 } from "./utils/MockERC20.sol";
+import { ReentrancyAttacker } from "./utils/ReentrancyAttacker.sol";
 import { SushiStakerTestBase } from "./utils/SushiStakerTestBase.sol";
 
 /**
@@ -92,5 +93,36 @@ contract UnstakeTest is SushiStakerTestBase {
         vm.prank(alice);
         vm.expectRevert(SushiStaker.SushiStakerTokenNotStaked.selector);
         staker.unstake(tokenId);
+    }
+
+    /**
+     * @notice Test that sending an NFT to staker during unstake callback properly stakes it
+     * @dev Regression test: a previous implementation silently accepted NFTs during unstake
+     *      without creating staking records, leaving them stuck. Now onERC721Received always
+     *      calls _stakeInternal, so the new NFT is properly staked.
+     */
+    function test_sendNftDuringUnstakeCallbackStakesProperly() public {
+        ReentrancyAttacker attacker = new ReentrancyAttacker(staker, mockNft);
+
+        // Mint two NFTs to the attacker contract
+        uint256 stakedTokenId = _mintNft(address(attacker));
+        uint256 newTokenId = _mintNft(address(attacker));
+
+        // Stake the first NFT
+        attacker.stakeToken(stakedTokenId);
+        assertEq(staker.isStaked(stakedTokenId), true);
+
+        // Unstake — callback sends the second NFT to staker during unstake
+        attacker.unstakeWithAttack(stakedTokenId, newTokenId);
+
+        // The unstaked NFT should be fully unstaked
+        assertEq(staker.isStaked(stakedTokenId), false);
+        assertEq(staker.getStaker(stakedTokenId), address(0));
+        assertEq(mockNft.ownerOf(stakedTokenId), address(attacker));
+
+        // The new NFT sent during the callback should be properly staked
+        assertEq(staker.isStaked(newTokenId), true);
+        assertEq(staker.getStaker(newTokenId), address(attacker));
+        assertEq(mockNft.ownerOf(newTokenId), address(staker));
     }
 }
