@@ -213,7 +213,10 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
 
     /**
      * @notice Unstake a SushiSwap NFT position
-     * @dev Collects accumulated fees and sends them to feeCollector before unstaking
+     * @dev Collects accumulated fees and sends them to feeCollector before unstaking.
+     *      Uses `transferFrom` instead of `safeTransferFrom` to return the NFT. This avoids
+     *      reverting when the staker is a contract that does not implement `IERC721Receiver`
+     *      (e.g. a smart wallet that originally received its NFT via `_mint` or `transferFrom`).
      * @param tokenId The token ID to unstake
      */
     function unstake(uint256 tokenId) external nonReentrant {
@@ -235,8 +238,8 @@ contract SushiStaker is Initializable, OwnableUpgradeable, ReentrancyGuard, IERC
         delete $.tokenStaker[tokenId];
         delete $.stakeTimestamp[tokenId];
 
-        // Transfer NFT back to user
-        IERC721(address($.sushiNft)).safeTransferFrom(address(this), msg.sender, tokenId);
+        // Transfer NFT back to user (see @dev for why transferFrom is used)
+        IERC721(address($.sushiNft)).transferFrom(address(this), msg.sender, tokenId);
     }
 
     /**
