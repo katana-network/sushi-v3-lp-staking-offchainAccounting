@@ -47,15 +47,6 @@ User → TransparentUpgradeableProxy → SushiStaker Implementation
 - Collects fees from multiple staked positions (skips unstaked tokens)
 - All fees sent to `feeCollector`
 
-### Fee Preview (New)
-- `collectFeesMultipleStats(tokenIds[])` - View function for backend integration
-- Returns cumulative statistics:
-  - `totalTokensOwed0/1`: Total collectable fees
-  - `stakedTokensCount/unstakedTokensCount`: Number of staked/unstaked tokens
-  - `totalLiquidity`: Sum of liquidity across staked positions
-  - `unstakedTokenIds[]`: Array of token IDs that are not staked
-- Use this to preview fees before calling `collectFeesMultiple`
-
 ## Installation & Setup
 
 ```bash
@@ -121,7 +112,6 @@ forge script script/Deploy.s.sol:UpgradeSushiStaker \
 | `stake(uint256 tokenId)` | Stake NFT position (requires approval first) |
 | `unstake(uint256 tokenId)` | Unstake position (only original staker) |
 | `collectFeesMultiple(uint256[] tokenIds)` | Batch collect fees (public) |
-| `collectFeesMultipleStats(uint256[] tokenIds)` | View function to preview fees before collection |
 
 ### View Functions
 
@@ -135,7 +125,7 @@ forge script script/Deploy.s.sol:UpgradeSushiStaker \
 | `getStakeTimestamp(uint256 tokenId)` | Unix timestamp of stake |
 | `isStaked(uint256 tokenId)` | Boolean staking status |
 | `getPositionInfo(uint256 tokenId)` | Position details (tokens, ticks, liquidity) |
-| `collectFeesMultipleStats(uint256[] tokenIds)` | Preview stats (fees, counts, liquidity, unstaked IDs) |
+
 
 ### Admin Functions (Owner Only)
 
@@ -253,17 +243,13 @@ forge test -vvv
 forge coverage
 
 # Run specific test file
-forge test --match-path "test/collectFeesMultipleStats.t.sol"
-
-# Run specific test
-forge test --match-test test_CollectFeesMultipleStats_MixedStakedAndUnstaked
+forge test --match-path "test/collectFeesMultiple.t.sol"
 ```
 
 **Test Coverage:**
 - Initialization and upgrades
 - Stake/unstake flows
 - Fee collection (pre-stake, post-stake, batch)
-- Fee statistics preview (`collectFeesMultipleStats`)
 - Error conditions (zero addresses, zero liquidity, authorization)
 - Admin functions (setFeeCollector, setGaugeVoter)
 - Direct NFT transfers (auto-staking via `onERC721Received`)
@@ -275,12 +261,11 @@ Tests are organized in modular files by functionality:
 - `test/stake.t.sol` - Staking functionality (7 tests)
 - `test/unstake.t.sol` - Unstaking functionality (4 tests)
 - `test/collectFeesMultiple.t.sol` - Batch fee collection (2 tests)
-- `test/collectFeesMultipleStats.t.sol` - Fee statistics preview (6 tests)
 - `test/onERC721Received.t.sol` - Direct NFT transfer handling (9 tests)
 - `test/setFeeCollector.t.sol` - Fee collector admin function (3 tests)
 - `test/setGaugeVoter.t.sol` - Gauge voter admin function (3 tests)
 
-**Test Results:** 38 tests passing across 8 test suites
+**Test Results:** 32 tests passing across 7 test suites
 
 ## License
 
