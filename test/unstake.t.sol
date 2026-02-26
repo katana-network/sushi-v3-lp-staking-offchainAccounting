@@ -3,8 +3,10 @@ pragma solidity 0.8.33;
 
 import { SushiStaker } from "../src/SushiStaker.sol";
 import { MockERC20 } from "./utils/MockERC20.sol";
+import { NonReceiverWallet } from "./utils/NonReceiverWallet.sol";
 import { ReentrancyAttacker } from "./utils/ReentrancyAttacker.sol";
 import { SushiStakerTestBase } from "./utils/SushiStakerTestBase.sol";
+import { IERC721 } from "@openzeppelin-contracts-5.5.0/token/ERC721/IERC721.sol";
 
 /**
  * @title UnstakeTest
@@ -96,33 +98,64 @@ contract UnstakeTest is SushiStakerTestBase {
     }
 
     /**
-     * @notice Test that sending an NFT to staker during unstake callback properly stakes it
-     * @dev Regression test: a previous implementation silently accepted NFTs during unstake
-     *      without creating staking records, leaving them stuck. Now onERC721Received always
-     *      calls _stakeInternal, so the new NFT is properly staked.
+     * @notice Test that unstake uses transferFrom (not safeTransferFrom), so
+     *         onERC721Received is never called on the recipient during unstake.
+     * @dev The ReentrancyAttacker sets shouldAttack=true before calling unstake.
+     *      If onERC721Received were triggered, shouldAttack would be flipped to false
+     *      and the attacker would send a second NFT. With transferFrom, the callback
+     *      never fires, so shouldAttack remains true and the second NFT stays put.
      */
-    function test_sendNftDuringUnstakeCallbackStakesProperly() public {
+    function test_unstakeDoesNotTriggerERC721ReceiverHook() public {
         ReentrancyAttacker attacker = new ReentrancyAttacker(staker, mockNft);
 
         // Mint two NFTs to the attacker contract
         uint256 stakedTokenId = _mintNft(address(attacker));
-        uint256 newTokenId = _mintNft(address(attacker));
+        uint256 secondTokenId = _mintNft(address(attacker));
 
         // Stake the first NFT
         attacker.stakeToken(stakedTokenId);
         assertEq(staker.isStaked(stakedTokenId), true);
 
-        // Unstake — callback sends the second NFT to staker during unstake
-        attacker.unstakeWithAttack(stakedTokenId, newTokenId);
+        // Unstake — attacker arms the callback, but transferFrom won't trigger it
+        attacker.unstakeWithAttack(stakedTokenId, secondTokenId);
 
-        // The unstaked NFT should be fully unstaked
+        // The unstaked NFT should be fully returned
         assertEq(staker.isStaked(stakedTokenId), false);
         assertEq(staker.getStaker(stakedTokenId), address(0));
         assertEq(mockNft.ownerOf(stakedTokenId), address(attacker));
 
-        // The new NFT sent during the callback should be properly staked
-        assertEq(staker.isStaked(newTokenId), true);
-        assertEq(staker.getStaker(newTokenId), address(attacker));
-        assertEq(mockNft.ownerOf(newTokenId), address(staker));
+        // The callback never fired, so shouldAttack was never flipped
+        assertEq(attacker.shouldAttack(), true);
+
+        // The second NFT was never sent to the staker
+        assertEq(staker.isStaked(secondTokenId), false);
+        assertEq(mockNft.ownerOf(secondTokenId), address(attacker));
+    }
+
+    /**
+     * @notice Test that a contract without IERC721Receiver can unstake successfully.
+     * @dev A smart wallet that received its NFT via _mint (not _safeMint) doesn't implement
+     *      onERC721Received. Using safeTransferFrom in unstake would permanently lock the NFT.
+     *      With transferFrom, unstake succeeds regardless.
+     */
+    function test_unstakeSucceedsForContractWithoutERC721Receiver() public {
+        NonReceiverWallet wallet = new NonReceiverWallet(staker, IERC721(address(mockNft)));
+
+        // Mint NFT directly to the wallet (via _mint, not _safeMint)
+        uint256 tokenId = _mintNft(address(wallet));
+        assertEq(mockNft.ownerOf(tokenId), address(wallet));
+
+        // Stake via the wallet — safeTransferFrom to SushiStaker works (staker implements IERC721Receiver)
+        wallet.approveAndStake(tokenId);
+        assertEq(staker.isStaked(tokenId), true);
+        assertEq(staker.getStaker(tokenId), address(wallet));
+
+        // Unstake — would revert with safeTransferFrom since wallet has no onERC721Received
+        wallet.unstake(tokenId);
+
+        // Verify successful unstake
+        assertEq(staker.isStaked(tokenId), false);
+        assertEq(staker.getStaker(tokenId), address(0));
+        assertEq(mockNft.ownerOf(tokenId), address(wallet));
     }
 }
