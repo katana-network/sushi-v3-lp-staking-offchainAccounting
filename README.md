@@ -6,6 +6,14 @@ A smart contract that allows users to stake their SushiSwap V3 NFT positions wit
 
 The staker contract enables users to deposit their SushiSwap V3 liquidity positions (represented as NFTs) and have their staking activity tracked on-chain. Fees are automatically collected and distributed, while reward calculations are performed off-chain based on emitted events.
 
+## Addresses
+
+| Contract            | Address                                      |
+| ------------------- | -------------------------------------------- |
+| SushiStaker (Proxy) | `0xbe12e1b5C4859a3d141412748279B67458F729E9` |
+| Implementation      | `0x9f26cAb97Ffe429952ce0387d780dBad97CA9e1e` |
+| Proxy admin         | `0xdb26e482602780789e3646BF1393eDfc49938544` |
+
 ## Key Features
 
 - **Stake/Unstake NFT Positions**: Users can deposit and withdraw their SushiSwap V3 positions at any time
